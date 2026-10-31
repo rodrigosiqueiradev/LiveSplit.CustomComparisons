@@ -1,0 +1,35 @@
+{
+  "format": "livesplit-custom-comparison",
+  "version": 1,
+  "name": "Safe Pace",
+  "root": {
+    "type": "fallback",
+    "primary": {
+      "type": "segmentRange",
+      "cases": [
+        {
+          "from": 1,
+          "to": 3,
+          "times": {
+            "type": "addTime",
+            "seconds": 0.5,
+            "source": { "type": "comparison", "name": "Best Segments" }
+          }
+        }
+      ],
+      "otherwise": {
+        "type": "aggregate",
+        "kind": "median",
+        "source": {
+          "type": "lastN",
+          "count": 10,
+          "source": {
+            "type": "completedRunsOnly",
+            "source": { "type": "segmentHistory" }
+          }
+        }
+      }
+    },
+    "fallback": { "type": "comparison", "name": "Personal Best" }
+  }
+}

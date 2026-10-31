@@ -1,0 +1,10 @@
+{
+  "format": "livesplit-custom-comparison",
+  "version": 1,
+  "name": "Golds +3%",
+  "root": {
+    "type": "scale",
+    "percent": 103,
+    "source": { "type": "comparison", "name": "Best Segments" }
+  }
+}

@@ -1,0 +1,458 @@
+:root {
+  --bg: #15171c;
+  --panel: #1b1e24;
+  --panel-2: #22262d;
+  --line: #2c3038;
+  --line-soft: #23262d;
+  --text: #e8eaed;
+  --muted: #a3a9b1;
+  --accent: #8ab4f8;
+  --ahead: #81c995;
+  --behind: #f28b82;
+  --warn: #fdd663;
+  --danger: #f28b82;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.spacer { flex: 1 1 auto; }
+
+/* ---------------------------------------------------------------- Header */
+
+.bar {
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.title { font-weight: 600; font-size: 14px; }
+.subtitle { color: var(--muted); }
+
+.primary, .secondary {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 6px;
+}
+
+.primary {
+  border: none;
+  background: var(--accent);
+  color: #15171c;
+  font-weight: 600;
+}
+
+.secondary {
+  border: 1px solid #3a3f48;
+  background: transparent;
+}
+
+.secondary:hover:not(:disabled) { background: #262a32; }
+.small { height: 28px; padding: 0 10px; }
+.danger { color: var(--danger); }
+
+/* ---------------------------------------------------------------- Tabs */
+
+.tabbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 14px 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.tabs { display: flex; gap: 2px; }
+
+.tab {
+  height: 32px;
+  max-width: 220px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab.invalid { color: var(--danger); }
+.tab.invalid::after { content: " ⚠"; }
+
+.new-tab {
+  height: 32px;
+  width: 36px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.new-tab:hover { color: var(--text); }
+
+.banner {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  background: #3b2420;
+  color: #fbd2cd;
+  border-bottom: 1px solid #5c312b;
+}
+
+/* ---------------------------------------------------------------- Main */
+
+.main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.namebar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.namebar label { color: var(--muted); }
+
+.namebar input {
+  width: 260px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid #3a3f48;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.namebar input[aria-invalid="true"] { border-color: var(--danger); }
+
+.name-error { color: var(--danger); }
+
+.workspace-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.blockly {
+  position: absolute;
+  inset: 0;
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.empty p { margin: 4px 0; }
+
+/* Blockly's category list, to match the rest of the window. The whole row is sized (not
+   just the label inside it), so the highlight and the colour stripe always line up with it. */
+.blocklyToolbox { padding: 8px 6px 0 0; min-width: 140px; }
+.blocklyToolboxCategory {
+  height: 32px;
+  line-height: 32px;
+  margin-bottom: 2px;
+  border-radius: 0 6px 6px 0;
+}
+.blocklyToolboxCategory .blocklyTreeRowContentContainer { height: 100%; display: flex; align-items: center; }
+.blocklyToolboxCategoryIcon { display: none !important; }
+.blocklyToolboxCategoryLabel { padding-left: 10px; font: 13px "Segoe UI", system-ui, sans-serif; color: var(--text); }
+.blocklyToolboxSelected .blocklyToolboxCategoryLabel { color: #fff; font-weight: 600; }
+
+/* ---------------------------------------------------------------- Preview */
+
+.preview {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+}
+
+.preview-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 10px;
+}
+
+.preview-title { font-weight: 600; font-size: 14px; }
+
+.toggle {
+  display: flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: #262a32;
+}
+
+.toggle button {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.toggle button[aria-pressed="true"] {
+  background: #3a3f48;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.rows {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.row.head {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom-color: var(--line);
+}
+
+.row .name {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row .time { text-align: right; }
+.row .stacked { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.row .delta { font-size: 11.5px; color: var(--muted); }
+.row .ahead { color: var(--ahead); }
+.row.below-gold { background: rgba(253, 214, 99, 0.10); box-shadow: inset 3px 0 0 var(--warn); }
+.row.below-gold .value { color: var(--warn); }
+.row .behind { color: var(--behind); }
+
+.preview-note {
+  padding: 6px 14px 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--line);
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  line-height: 1.45;
+}
+
+.status.ok { color: var(--ahead); font-weight: 500; }
+.status.ok::before { content: "✓"; }
+.status.info { color: var(--muted); }
+.status.warn { color: var(--warn); }
+.status.error { color: var(--danger); }
+
+.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------- What fits where */
+
+.legend {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.legend strong { color: var(--text); font-weight: 600; }
+
+.blocklyFlyoutLabelText { fill: var(--muted) !important; font: 12px "Segoe UI", system-ui, sans-serif !important; }
+
+/* ---------------------------------------------------------------- Summary, undo */
+
+.summary {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.summary:empty { display: none; }
+.summary.unfinished { color: var(--muted); font-style: italic; }
+.icon { width: 32px; padding: 0; font-size: 16px; }
+
+/* ---------------------------------------------------------------- Preview extras */
+
+.preview-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  line-height: 1.4;
+}
+
+.preview-note select {
+  height: 24px;
+  max-width: 170px;
+  border-radius: 5px;
+  border: 1px solid #3a3f48;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.row.clickable { cursor: pointer; }
+.row.clickable:hover { background: #20242b; }
+.row.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.row .origin {
+  display: none;
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.row.expanded .origin { display: block; }
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.total { display: inline-flex; align-items: baseline; gap: 6px; }
+.total-label { color: var(--muted); }
+.total-value { font-family: Consolas, "Cascadia Mono", monospace; font-weight: 600; }
+.total-delta { font-family: Consolas, "Cascadia Mono", monospace; }
+
+/* ---------------------------------------------------------------- Templates */
+
+.templates {
+  width: min(560px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.templates::backdrop { background: rgba(0, 0, 0, 0.55); }
+.templates-head { display: flex; align-items: center; justify-content: space-between; }
+.templates h2 { margin: 0; font-size: 16px; }
+.templates-intro { margin: 6px 0 14px; color: var(--muted); }
+.template-list { display: grid; gap: 8px; }
+
+.template {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #3a3f48;
+  border-radius: 8px;
+  background: var(--panel-2);
+  text-align: left;
+}
+
+.template:hover { border-color: var(--accent); }
+.template-title { font-weight: 600; }
+.template-description { color: var(--muted); font-size: 12.5px; }

@@ -1,0 +1,21 @@
+{
+  "format": "livesplit-custom-comparison",
+  "version": 1,
+  "name": "Median Last 10 +1s",
+  "root": {
+    "type": "addTime",
+    "seconds": 1,
+    "source": {
+      "type": "aggregate",
+      "kind": "median",
+      "source": {
+        "type": "lastN",
+        "count": 10,
+        "source": {
+          "type": "completedRunsOnly",
+          "source": { "type": "segmentHistory" }
+        }
+      }
+    }
+  }
+}

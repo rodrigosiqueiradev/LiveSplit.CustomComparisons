@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure evaluation engine. No LiveSplit dependency, so it can be unit-tested
+    on any OS. The component project compiles these sources directly into its
+    own DLL, so runners only ever install one file.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>CustomComparisons.Engine</RootNamespace>
+  </PropertyGroup>
+
+</Project>

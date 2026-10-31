@@ -1,0 +1,17 @@
+{
+  "name": "custom-comparisons-editor",
+  "private": true,
+  "version": "0.3.0",
+  "description": "Block editor for LiveSplit Custom Comparisons. Built into ../src/LiveSplit.CustomComparisons/EditorDist.",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p . && node scripts/copy-assets.mjs",
+    "watch": "tsc -p . --watch"
+  },
+  "dependencies": {
+    "blockly": "^12.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0"
+  }
+}

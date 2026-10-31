@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Must match LiveSplit itself. -->
+    <TargetFramework>net481</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>LiveSplit.CustomComparisons</AssemblyName>
+    <RootNamespace>LiveSplit.CustomComparisons</RootNamespace>
+    <Version>0.1.0</Version>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <!--
+    Where your LiveSplit install lives (the folder with LiveSplit.exe), in order of preference:
+      1. dotnet build -p:LiveSplitDir="D:\Tools\LiveSplit"
+      2. local.props in the repository root (git-ignored), see README
+      3. the LIVESPLIT_DIR environment variable
+  -->
+  <Import Project="..\..\local.props" Condition="Exists('..\..\local.props')" />
+  <PropertyGroup>
+    <LiveSplitDir Condition="'$(LiveSplitDir)' == ''">$(LIVESPLIT_DIR)</LiveSplitDir>
+  </PropertyGroup>
+
+  <Target Name="CheckLiveSplitDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(LiveSplitDir)' == '' Or !Exists('$(LiveSplitDir)\LiveSplit.Core.dll')"
+           Text="Can't find LiveSplit (looked in '$(LiveSplitDir)'). Point LiveSplitDir at the folder containing LiveSplit.exe: see 'Build' in README.md." />
+  </Target>
+
+  <ItemGroup>
+    <!-- Lets you build without installing the .NET Framework 4.8.1 targeting pack. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Provided by LiveSplit at runtime, so never copied next to our DLL. -->
+    <Reference Include="LiveSplit.Core">
+      <HintPath>$(LiveSplitDir)\LiveSplit.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UpdateManager">
+      <HintPath>$(LiveSplitDir)\UpdateManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!--
+      WebView2 for the block editor. LiveSplit already ships these with its Racetime
+      component, so we use its copies and never ship our own (no version clashes).
+    -->
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>$(LiveSplitDir)\Components\Microsoft.Web.WebView2.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.WinForms">
+      <HintPath>$(LiveSplitDir)\Components\Microsoft.Web.WebView2.WinForms.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The block editor page, built from ../../editor with `npm run build`.
+      Embedded so the component stays a single DLL. Served from memory, never from disk.
+    -->
+    <EmbeddedResource Include="EditorDist\**\*" LogicalName="editor/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <Target Name="CheckEditorBuilt" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('EditorDist\index.html') Or !Exists('EditorDist\editor.js')"
+           Text="The block editor hasn't been built. Run: cd editor; npm install; npm run build" />
+  </Target>
+
+  <ItemGroup>
+    <!--
+      Compile the engine straight into this assembly so runners install a single DLL.
+      The engine stays a separate project only so it can be tested without LiveSplit.
+    -->
+    <Compile Include="..\CustomComparisons.Engine\**\*.cs" Exclude="..\CustomComparisons.Engine\obj\**;..\CustomComparisons.Engine\bin\**" LinkBase="Engine" />
+  </ItemGroup>
+
+  <!-- Optional: dotnet build -p:DeployToLiveSplit=true copies the DLL into LiveSplit's Components folder. -->
+  <Target Name="DeployToLiveSplit" AfterTargets="Build" Condition="'$(DeployToLiveSplit)' == 'true'">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(LiveSplitDir)\Components" />
+  </Target>
+
+</Project>

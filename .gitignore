@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+build-log.txt
+editor/node_modules/
+src/LiveSplit.CustomComparisons/EditorDist/
+setup-git-log.txt
+setup-git.ps1
+local.props
+publish-github.ps1
+publish-github-log.txt

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Custom Comparisons – Block editor</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <header class="bar">
+    <span class="title">Custom Comparisons</span>
+    <span class="subtitle">Block editor</span>
+    <span class="spacer"></span>
+    <button id="cancel" type="button" class="secondary">Cancel</button>
+    <button id="save" type="button" class="primary" title="Save (Ctrl+S)">Save</button>
+  </header>
+
+  <nav class="tabbar" aria-label="Comparisons">
+    <div id="tabs" class="tabs" role="tablist"></div>
+    <button id="new-tab" type="button" class="new-tab" aria-label="New comparison" title="New comparison">+</button>
+  </nav>
+
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <main class="main">
+    <section class="editor">
+      <div class="namebar">
+        <label for="name">Name</label>
+        <input id="name" type="text" maxlength="64" autocomplete="off" spellcheck="false">
+        <div id="name-error" class="name-error" aria-live="polite"></div>
+        <span class="spacer"></span>
+        <button id="undo" type="button" class="secondary small icon" aria-label="Undo" title="Undo (Ctrl+Z)">↶</button>
+        <button id="redo" type="button" class="secondary small icon" aria-label="Redo" title="Redo (Ctrl+Y)">↷</button>
+        <button id="duplicate" type="button" class="secondary small">Duplicate</button>
+        <button id="delete" type="button" class="secondary small danger">Delete</button>
+      </div>
+      <div id="summary" class="summary" aria-live="polite"></div>
+      <div class="legend" aria-label="What fits where">
+        <span class="legend-item">
+          <svg width="30" height="16" viewBox="0 0 30 16" aria-hidden="true"><path d="M7 1h16l6 7-6 7H7L1 8z" fill="#1d4ed8"/></svg>
+          <span>gives a <strong>list of times</strong> for each segment, and fits hexagon slots</span>
+        </span>
+        <span class="legend-item">
+          <svg width="30" height="16" viewBox="0 0 30 16" aria-hidden="true"><rect x="1" y="1" width="28" height="14" rx="7" fill="#b45309"/></svg>
+          <span>gives <strong>one time</strong> for each segment, and fits round slots</span>
+        </span>
+      </div>
+      <div class="workspace-wrap">
+        <div id="blockly" class="blockly"></div>
+        <div id="empty" class="empty" hidden>
+          <p>No comparisons yet.</p>
+          <button id="empty-start" type="button" class="primary">Make one</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="preview" aria-label="Preview">
+      <div class="preview-head">
+        <span class="preview-title">Preview</span>
+        <span class="spacer"></span>
+        <div class="toggle" role="group" aria-label="Timing method">
+          <button type="button" data-timing="RealTime" aria-pressed="true">Real time</button>
+          <button type="button" data-timing="GameTime" aria-pressed="false">Game time</button>
+        </div>
+      </div>
+      <div class="row head" aria-hidden="true">
+        <span class="name">Segment</span><span class="time">Segment time</span><span class="time">Split time</span>
+      </div>
+      <div class="preview-note">
+        <label for="compare-to">Coloured numbers: difference from</label>
+        <select id="compare-to"></select>
+        <span>for the time right above them. Click a segment to see where its time comes from.</span>
+      </div>
+      <div id="preview-rows" class="rows"></div>
+      <div id="totals" class="totals" hidden></div>
+      <div id="preview-status" class="status info" aria-live="polite"><span>Loading…</span></div>
+    </aside>
+  </main>
+
+  <dialog id="templates" class="templates" aria-labelledby="templates-title">
+    <form method="dialog" class="templates-head">
+      <h2 id="templates-title">New comparison</h2>
+      <button type="submit" class="secondary small" aria-label="Close">Cancel</button>
+    </form>
+    <p class="templates-intro">Start from one of these and change anything you like.</p>
+    <div id="template-list" class="template-list"></div>
+  </dialog>
+
+  <script src="blockly_compressed.js"></script>
+  <script src="msg_en.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

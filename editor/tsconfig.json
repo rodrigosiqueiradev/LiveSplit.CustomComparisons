@@ -1,0 +1,28 @@
+{
+  // The editor runs inside WebView2 with Blockly loaded as a plain <script>, so the
+  // TypeScript is compiled as global scripts into one file. No bundler needed.
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "none",
+    "moduleResolution": "node10",
+    "outFile": "../src/LiveSplit.CustomComparisons/EditorDist/editor.js",
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true,
+    "removeComments": false,
+    "sourceMap": false
+  },
+  "files": [
+    "src/globals.d.ts",
+    "src/protocol.ts",
+    "src/format.ts",
+    "src/blocks.ts",
+    "src/describe.ts",
+    "src/templates.ts",
+    "src/compile.ts",
+    "src/bridge.ts",
+    "src/main.ts"
+  ]
+}

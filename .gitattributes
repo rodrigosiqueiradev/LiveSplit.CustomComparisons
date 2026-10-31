@@ -1,0 +1,9 @@
+# Normalise line endings in the repository; check out with the platform's default.
+* text=auto
+
+# Visual Studio needs CRLF in solution files.
+*.sln text eol=crlf
+
+# Never touch binary files.
+*.png binary
+*.dll binary
