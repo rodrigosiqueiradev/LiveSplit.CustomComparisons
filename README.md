@@ -6,6 +6,9 @@ A LiveSplit component that lets runners build their own comparisons from blocks:
 filters, aggregates, segment ranges and fallbacks over their own run history.
 The results show up in LiveSplit's **Compare Against** menu like any built-in comparison.
 
+**New here? Read the [User Guide](docs/USER-GUIDE.md)**: installing, building your first
+comparison, every block explained, recipes and troubleshooting. No coding needed.
+
 **Status: in development, no release yet.** Build comparisons in a block editor with a live preview of your
 own splits. Comparisons are saved in your layout and can be shared as `.json` files
 (see [`examples/`](examples)).
@@ -73,7 +76,8 @@ git push origin v0.2.0
 
 CI builds that version and, once the tests pass, publishes a GitHub release with
 `LiveSplit.CustomComparisons-0.2.0.zip` attached. Unzip it into the LiveSplit folder: the DLL
-lands in `Components`, and the readme, licence and example comparisons in `CustomComparisons`.
+lands in `Components`, and the user guide, readme, licence and example comparisons in
+`CustomComparisons`.
 
 The component builds into a single `LiveSplit.CustomComparisons.dll`.
 Copy it into `LiveSplit\Components` if you didn't use `DeployToLiveSplit`.

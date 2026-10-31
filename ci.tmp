@@ -96,7 +96,7 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP 'package'
           New-Item -ItemType Directory "$root/Components", "$root/CustomComparisons" -Force | Out-Null
           Copy-Item src/LiveSplit.CustomComparisons/bin/Release/net481/LiveSplit.CustomComparisons.dll "$root/Components/"
-          Copy-Item README.md, LICENSE "$root/CustomComparisons/"
+          Copy-Item README.md, LICENSE, docs/USER-GUIDE.md "$root/CustomComparisons/"
           Copy-Item examples "$root/CustomComparisons/examples" -Recurse
           Compress-Archive "$root/*" -DestinationPath "${{ steps.version.outputs.package }}.zip"
       - uses: actions/upload-artifact@v7
