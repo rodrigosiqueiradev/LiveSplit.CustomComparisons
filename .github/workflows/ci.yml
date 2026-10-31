@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+env:
+  # The LiveSplit release the component is compiled against. Its DLLs are downloaded
+  # from LiveSplit's own GitHub release (MIT-licensed) and never committed here.
+  LIVESPLIT_VERSION: "1.8.37"
 
 jobs:
   engine:
@@ -16,21 +22,57 @@ jobs:
           dotnet-version: "8.0.x"
       - run: dotnet test tests/CustomComparisons.Engine.Tests --nologo
 
-  editor:
-    name: Block editor build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: editor
+  component:
+    name: Component (editor + DLL)
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      # 1. The block editor, which gets embedded in the DLL.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: editor/package-lock.json
-      - run: npm ci
-      - run: npm run build
+      - name: Build the block editor
+        working-directory: editor
+        run: |
+          npm ci
+          npm run build
 
-  # The LiveSplit component itself isn't built here: it compiles against LiveSplit's own
-  # DLLs, which aren't redistributable from this repository. Build it locally (see README).
+      # 2. LiveSplit, to compile against. Cached per version so it's downloaded once.
+      - name: Cache LiveSplit
+        id: livesplit-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/LiveSplit
+          key: livesplit-${{ env.LIVESPLIT_VERSION }}
+      - name: Download LiveSplit
+        if: steps.livesplit-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'LiveSplit.zip'
+          Invoke-WebRequest "https://github.com/LiveSplit/LiveSplit/releases/download/$env:LIVESPLIT_VERSION/LiveSplit_$env:LIVESPLIT_VERSION.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'LiveSplit')
+      - name: Find LiveSplit
+        shell: pwsh
+        run: |
+          # The zip may or may not have a top-level folder: find LiveSplit.Core.dll wherever it is.
+          $core = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'LiveSplit') -Recurse -Filter LiveSplit.Core.dll | Select-Object -First 1
+          if (-not $core) { throw "LiveSplit.Core.dll not found in the LiveSplit $env:LIVESPLIT_VERSION download." }
+          "LIVESPLIT_DIR=$($core.DirectoryName)" | Out-File $env:GITHUB_ENV -Append
+          Write-Host "LiveSplit found in $($core.DirectoryName)"
+
+      # 3. The component.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build the component
+        run: dotnet build src/LiveSplit.CustomComparisons -c Release --nologo
+
+      # 4. The finished DLL, downloadable from the run's summary page.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveSplit.CustomComparisons
+          path: src/LiveSplit.CustomComparisons/bin/Release/net481/LiveSplit.CustomComparisons.dll
+          if-no-files-found: error

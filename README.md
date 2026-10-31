@@ -57,8 +57,9 @@ dotnet test tests/CustomComparisons.Engine.Tests
 dotnet build src/LiveSplit.CustomComparisons -c Release -p:DeployToLiveSplit=true
 ```
 
-CI runs the engine tests and builds the editor on every push. The component itself is built
-locally, because it compiles against LiveSplit's own DLLs.
+CI runs on every push: the engine tests on Linux, and on Windows the editor plus the
+component, compiled against the official LiveSplit release it downloads. Each run's summary
+page has the built `LiveSplit.CustomComparisons.dll` to download.
 
 The component builds into a single `LiveSplit.CustomComparisons.dll`.
 Copy it into `LiveSplit\Components` if you didn't use `DeployToLiveSplit`.
