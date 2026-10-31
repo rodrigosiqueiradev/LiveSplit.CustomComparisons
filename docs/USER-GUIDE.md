@@ -64,8 +64,12 @@ layout goes.
 
 1. Right-click LiveSplit → **Edit Layout…**, then double-click **Custom Comparisons** in the
    list (or select it and click **Layout Settings**, then its tab).
-2. Click **Open block editor…**
-3. Pick a starting point. Each one is a finished comparison you can use as it is or change:
+2. Click **Open block editor…** The editor opens with a tab for each comparison you already
+   have.
+3. Click the **+** next to the tabs and pick a starting point. Each one is a finished
+   comparison you can use as it is or change:
+
+   ![The "New comparison" window with five starting points](images/templates.png)
 
    | Starting point | What it gives you |
    |---|---|
@@ -107,20 +111,9 @@ your latest 10.
 
 ## 6. A tour of the block editor
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│ Custom Comparisons · Block editor                               [Cancel] [Save]  │
-├─[ Recent form ]─[ Goal pace ]─[ + ]──────────────────────────────────────────────┤
-│ Name: [Recent form      ]  ↶ ↷  [Duplicate] [Delete]  │ Preview  [Real][Game]   │
-│ ┌──────────┐                                           │ Segment   Seg.   Split   │
-│ │ Sources  │   ┌─────────────────────────┐             │ Forest    1:02   1:02    │
-│ │ Filters  │   │ this comparison is ...  │             │ Castle    2:11   3:13    │
-│ │Aggregates│   └─────────────────────────┘             │ ...                      │
-│ │ Math     │                                           │                          │
-│ │ Control  │                                           │ Coloured numbers: vs PB  │
-│ └──────────┘                                           │                          │
-└──────────────────────────────────────────────────────────────────────────────────┘
-```
+*The pictures in this guide use made-up sample splits.*
+
+![The block editor: tabs at the top, the block drawer on the left, blocks in the middle and the preview on the right](images/editor-overview.png)
 
 **Tabs (top).** Each tab is one comparison. Click **+** to add another. All tabs are saved
 together when you click **Save**.
@@ -128,14 +121,22 @@ together when you click **Save**.
 **Name, Undo/Redo, Duplicate, Delete.** Undo and redo work per tab (**Ctrl+Z** / **Ctrl+Y**).
 *Duplicate* copies the current comparison into a new tab, handy for trying a variation.
 
+**Summary line.** Under the name, the editor describes your blocks in a plain sentence, for
+example *"Intro–Caves: your golds + 0.5 s. Other segments: the median of your last 10 times
+from completed runs. Gaps filled from your PB."* Read it to check the blocks mean what you
+think they mean.
+
 **Block drawer (left).** Five groups of blocks: *Sources*, *Filters*, *Aggregates*, *Math*
 and *Control*. Click a group to open it, then drag a block out onto the canvas. Each group
 has short headings explaining what its blocks are for. Hover over any block to see a tip.
+The drawer stays open while you work; click the selected group again to close it.
+
+![The Filters group open in the block drawer](images/drawer-filters.png)
 
 **Canvas (middle).** Where you build. Drag blocks near each other and they snap together.
 Zoom with the mouse wheel (or the **+ / −** buttons in the corner); drag an empty spot to move
-around. To delete a block, drag it back onto
-the drawer or select it and press **Delete**.
+around. To delete a block, drag it onto the bin in the corner (or back onto the drawer), or
+select it and press **Delete**.
 
 **Preview (right).**
 
@@ -147,10 +148,15 @@ the drawer or select it and press **Delete**.
 - **Real time / Game time** switches which of your times the preview uses.
 - **Click a row** to see *why* it has that time: which block it came from and, for example,
   which comparison was used to fill a gap.
-- A **highlighted row** means that segment is faster than your best ever time for it (your
-  gold). That's allowed, but it's a warning that the pace may not be realistic. There's a
-  note under the table listing them.
+- A **yellow row** means that segment is faster than your best ever time for it (your
+  gold). That's allowed, but it's a warning that the pace may not be realistic. A yellow
+  note at the bottom lists them (see the right-hand picture below).
 - The line under the table compares the finish time with your PB and your sum of best.
+- The very bottom says **No problems**, or explains what needs attention.
+
+| Castle clicked: where its time comes from | Faster than gold: yellow rows and a warning |
+|---|---|
+| <img src="images/preview.png" alt="The preview with the Castle row opened, showing where its time comes from" width="380"> | <img src="images/below-gold.png" alt="The preview with three yellow rows that are faster than gold, and a warning at the bottom" width="380"> |
 
 ---
 
@@ -169,18 +175,14 @@ Blocks plug into each other like puzzle pieces, and their **shape** tells you wh
   like *median of* or *percentile 70 of*.
 - Blocks only snap where they fit. If a block won't snap, it's the wrong shape for that spot.
 
-Read a chain from the inside out. For example:
+Read a chain from the inside out. For example, the starter comparison:
 
-```
-this comparison is
-  median of
-    last 10 times of
-      from completed runs only
-        all my times for each segment
-```
+![The starter comparison: add 1 s per segment to the median of the last 10 times of from completed runs only of all my times for each segment](images/chain.png)
 
 means: *take all my times for each segment → keep only those from finished runs → keep the
-latest 10 → take the middle one.*
+latest 10 → take the middle one → add a second.* The hexagon blocks (blue and teal) pass a
+list along; the round *median* block turns it into one time; the round *add* block adjusts it.
+The two coloured shapes above the canvas are a reminder of which is which.
 
 ---
 
