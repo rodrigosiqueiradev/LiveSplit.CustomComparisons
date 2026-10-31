@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Pushing a tag like v0.2.0 builds that version and publishes it as a GitHub release.
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # The LiveSplit release the component is compiled against. Its DLLs are downloaded
+  # from LiveSplit's own GitHub release (MIT-licensed) and never committed here.
+  LIVESPLIT_VERSION: "1.8.37"
+
+jobs:
+  engine:
+    name: Engine tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet test tests/CustomComparisons.Engine.Tests --nologo
+
+  component:
+    name: Component (editor + DLL)
+    runs-on: windows-latest
+    outputs:
+      package: ${{ steps.version.outputs.package }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # 0. Which version this is: the tag's for a release, otherwise a CI build number.
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = $env:GITHUB_REF_NAME.TrimStart('v')
+            if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Release tags look like v1.2.3, not '$env:GITHUB_REF_NAME'." }
+            "msbuild=-p:Version=$version" | Out-File $env:GITHUB_OUTPUT -Append
+          } else {
+            $version = "ci-$env:GITHUB_RUN_NUMBER"
+            "msbuild=" | Out-File $env:GITHUB_OUTPUT -Append
+          }
+          "package=LiveSplit.CustomComparisons-$version" | Out-File $env:GITHUB_OUTPUT -Append
+
+      # 1. The block editor, which gets embedded in the DLL.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+      - name: Build the block editor
+        working-directory: editor
+        run: |
+          npm ci
+          npm run build
+
+      # 2. LiveSplit, to compile against. Cached per version so it's downloaded once.
+      - name: Cache LiveSplit
+        id: livesplit-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/LiveSplit
+          key: livesplit-${{ env.LIVESPLIT_VERSION }}
+      - name: Download LiveSplit
+        if: steps.livesplit-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'LiveSplit.zip'
+          Invoke-WebRequest "https://github.com/LiveSplit/LiveSplit/releases/download/$env:LIVESPLIT_VERSION/LiveSplit_$env:LIVESPLIT_VERSION.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'LiveSplit')
+      - name: Find LiveSplit
+        shell: pwsh
+        run: |
+          # The zip may or may not have a top-level folder: find LiveSplit.Core.dll wherever it is.
+          $core = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'LiveSplit') -Recurse -Filter LiveSplit.Core.dll | Select-Object -First 1
+          if (-not $core) { throw "LiveSplit.Core.dll not found in the LiveSplit $env:LIVESPLIT_VERSION download." }
+          "LIVESPLIT_DIR=$($core.DirectoryName)" | Out-File $env:GITHUB_ENV -Append
+          Write-Host "LiveSplit found in $($core.DirectoryName)"
+
+      # 3. The component.
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build the component
+        run: dotnet build src/LiveSplit.CustomComparisons -c Release --nologo ${{ steps.version.outputs.msbuild }}
+
+      # 4. The download package: unzip it into the LiveSplit folder and the DLL lands in Components.
+      - name: Make the package
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'package'
+          New-Item -ItemType Directory "$root/Components", "$root/CustomComparisons" -Force | Out-Null
+          Copy-Item src/LiveSplit.CustomComparisons/bin/Release/net481/LiveSplit.CustomComparisons.dll "$root/Components/"
+          Copy-Item README.md, LICENSE "$root/CustomComparisons/"
+          Copy-Item examples "$root/CustomComparisons/examples" -Recurse
+          Compress-Archive "$root/*" -DestinationPath "${{ steps.version.outputs.package }}.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.version.outputs.package }}
+          path: ${{ steps.version.outputs.package }}.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    if: github.ref_type == 'tag'
+    needs: [engine, component]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.component.outputs.package }}
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "${{ needs.component.outputs.package }}.zip" \
+            --title "Custom Comparisons $GITHUB_REF_NAME" --generate-notes --verify-tag

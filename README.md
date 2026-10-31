@@ -57,9 +57,23 @@ dotnet test tests/CustomComparisons.Engine.Tests
 dotnet build src/LiveSplit.CustomComparisons -c Release -p:DeployToLiveSplit=true
 ```
 
-CI runs on every push: the engine tests on Linux, and on Windows the editor plus the
-component, compiled against the official LiveSplit release it downloads. Each run's summary
-page has the built `LiveSplit.CustomComparisons.dll` to download.
+CI runs on every push (and on demand from the Actions tab): the engine tests on Linux, and
+on Windows the editor plus the component, compiled against the official LiveSplit release it
+downloads. Each run's summary page has a package to download.
+
+### Releasing
+
+Bump `<Version>` in `src/LiveSplit.CustomComparisons/LiveSplit.CustomComparisons.csproj`, commit,
+then push a tag with the same version:
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+CI builds that version and, once the tests pass, publishes a GitHub release with
+`LiveSplit.CustomComparisons-0.2.0.zip` attached. Unzip it into the LiveSplit folder: the DLL
+lands in `Components`, and the readme, licence and example comparisons in `CustomComparisons`.
 
 The component builds into a single `LiveSplit.CustomComparisons.dll`.
 Copy it into `LiveSplit\Components` if you didn't use `DeployToLiveSplit`.
