@@ -65,6 +65,31 @@ function compileTimes(block: Blockly.Block | null, parent: Blockly.Block, emptyM
     case BLOCK.attempt:
       return { type: "attempt", number: Number(block.getFieldValue("NUMBER")) };
 
+    case BLOCK.bestRecent:
+      return { type: "bestRecentRun", days: Number(block.getFieldValue("DAYS")) };
+
+    case BLOCK.weighted:
+      return {
+        type: "weightedAverage",
+        halfLife: Number(block.getFieldValue("HALF_LIFE")),
+        source: compileSamples(block.getInputTargetBlock("SOURCE"), block),
+      };
+
+    case BLOCK.clamp:
+      return {
+        type: "clamp",
+        source: compileTimes(block.getInputTargetBlock("SOURCE"), block, "Snap the times to keep into this block."),
+        low: compileTimes(block.getInputTargetBlock("LOW"), block, "Fill the \"never faster than\" slot."),
+        high: compileTimes(block.getInputTargetBlock("HIGH"), block, "Fill the \"never slower than\" slot."),
+      };
+
+    case BLOCK.round:
+      return {
+        type: "round",
+        step: Number(block.getFieldValue("STEP")),
+        source: compileTimes(block.getInputTargetBlock("SOURCE"), block, "Snap the times to round into this block."),
+      };
+
     case BLOCK.percentile:
       return {
         type: "percentile",
@@ -158,6 +183,12 @@ function compileSamples(block: Blockly.Block | null, parent: Blockly.Block): Ast
         source: compileSamples(block.getInputTargetBlock("SOURCE"), block),
       };
     }
+    case BLOCK.reached:
+      return {
+        type: "reachedSegment",
+        segment: Number(block.getFieldValue("SEGMENT")),
+        source: compileSamples(block.getInputTargetBlock("SOURCE"), block),
+      };
     case BLOCK.atLeast:
       return {
         type: "atLeast",
@@ -224,6 +255,21 @@ function timesToBlock(node: AstNode): BlockState {
       };
     case "attempt":
       return { type: BLOCK.attempt, fields: { NUMBER: node.number } };
+    case "bestRecentRun":
+      return { type: BLOCK.bestRecent, fields: { DAYS: node.days } };
+    case "weightedAverage":
+      return { type: BLOCK.weighted, fields: { HALF_LIFE: node.halfLife }, inputs: { SOURCE: { block: samplesToBlock(node.source as AstNode) } } };
+    case "clamp":
+      return {
+        type: BLOCK.clamp,
+        inputs: {
+          SOURCE: { block: timesToBlock(node.source as AstNode) },
+          LOW: { block: timesToBlock(node.low as AstNode) },
+          HIGH: { block: timesToBlock(node.high as AstNode) },
+        },
+      };
+    case "round":
+      return { type: BLOCK.round, fields: { STEP: String(node.step) }, inputs: { SOURCE: { block: timesToBlock(node.source as AstNode) } } };
     case "percentile":
       return { type: BLOCK.percentile, fields: { PERCENT: node.percent }, inputs: { SOURCE: { block: samplesToBlock(node.source as AstNode) } } };
     case "stretchToTotal":
@@ -275,6 +321,9 @@ function samplesToBlock(node: AstNode): BlockState {
       return { type: BLOCK.trim, fields: { PERCENT: node.percent }, inputs: { SOURCE: { block: samplesToBlock(node.source as AstNode) } } };
     case "finishedUnder":
       return { type: BLOCK.finishedUnder, fields: { GOAL: formatDuration(Number(node.totalSeconds)) }, inputs: { SOURCE: { block: samplesToBlock(node.source as AstNode) } } };
+    case "reachedSegment":
+      extraSegmentNumbers.add(Number(node.segment));
+      return { type: BLOCK.reached, fields: { SEGMENT: String(node.segment) }, inputs: { SOURCE: { block: samplesToBlock(node.source as AstNode) } } };
     case "atLeast":
       return { type: BLOCK.atLeast, fields: { COUNT: node.count }, inputs: { SOURCE: { block: samplesToBlock(node.source as AstNode) } } };
     case "recentDays":
@@ -295,9 +344,10 @@ function rememberComparisonNames(state: unknown): void {
         comparisonChoices.extra.add((obj.fields as Record<string, string>).NAME);
       }
 
-      if (obj.type === BLOCK.range && obj.fields) {
+      if ((obj.type === BLOCK.range || obj.type === BLOCK.reached) && obj.fields) {
         const fields = obj.fields as Record<string, unknown>;
-        for (const key of ["FROM", "TO"]) {
+        for (const key of ["FROM", "TO", "SEGMENT"]) {
+          if (!(key in fields)) continue;
           const n = Number(fields[key]);
           if (Number.isInteger(n) && n >= 1) extraSegmentNumbers.add(n);
         }

@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "LiveSplit": {
+      "commandName": "Executable",
+      "executablePath": "$(LiveSplitDir)\\LiveSplit.exe",
+      "workingDirectory": "$(LiveSplitDir)"
+    }
+  }
+}

@@ -226,6 +226,26 @@ public sealed class ComparisonEvaluator
                     return Through(n, Trace(n.Source).paths);
                 case StretchToTotalNode n:
                     return Through(n, Trace(n.Source).paths);
+                case RoundNode n:
+                    return Through(n, Trace(n.Source).paths);
+
+                case ClampNode n:
+                {
+                    // Points at whichever input the time ended up equal to: a limit, or the source.
+                    (TimeSpan?[] source, string[] sourcePaths) = Trace(n.Source);
+                    (TimeSpan?[] low, string[] lowPaths) = Trace(n.Low);
+                    (TimeSpan?[] high, string[] highPaths) = Trace(n.High);
+                    TimeSpan?[] values = EvalTimes(n);
+                    var paths = new string[values.Length];
+                    for (int i = 0; i < values.Length; i++)
+                    {
+                        paths[i] = !values[i].HasValue || values[i] == source[i] ? Join("source", sourcePaths[i])
+                            : values[i] == low[i] ? Join("low", lowPaths[i])
+                            : Join("high", highPaths[i]);
+                    }
+
+                    return (values, paths);
+                }
 
                 default:
                 {
@@ -257,6 +277,45 @@ public sealed class ComparisonEvaluator
 
                 case AttemptNode n:
                     return AttemptSegments(n.Number);
+
+                case BestRecentRunNode n:
+                {
+                    DateTime cutoff = run.NowUtc.AddDays(-n.Days);
+                    AttemptData best = run.Attempts.Values
+                        .Where(a => a.Completed && a.FinalTime.HasValue && a.WhenUtc.HasValue && a.WhenUtc.Value >= cutoff)
+                        .OrderBy(a => a.FinalTime.Value)
+                        .ThenBy(a => a.Index)
+                        .FirstOrDefault();
+                    return best == null ? new TimeSpan?[run.SegmentCount] : AttemptSegments(best.Index);
+                }
+
+                case WeightedAverageNode n:
+                    return EvalSamples(n.Source).Select(samples => WeightedAverage(samples, n.HalfLife)).ToArray();
+
+                case ClampNode n:
+                {
+                    TimeSpan?[] source = EvalTimes(n.Source);
+                    TimeSpan?[] low = EvalTimes(n.Low);
+                    TimeSpan?[] high = EvalTimes(n.High);
+                    return source.Select((t, i) =>
+                    {
+                        if (!t.HasValue) return (TimeSpan?)null;
+                        TimeSpan v = t.Value;
+                        if (high[i].HasValue && v > high[i].Value) v = high[i].Value;
+                        if (low[i].HasValue && v < low[i].Value) v = low[i].Value;
+                        return v;
+                    }).ToArray();
+                }
+
+                case RoundNode n:
+                {
+                    long step = n.Step.Ticks;
+                    return EvalTimes(n.Source)
+                        .Select(t => t.HasValue
+                            ? TimeSpan.FromTicks((t.Value.Ticks + step / 2) / step * step)
+                            : (TimeSpan?)null)
+                        .ToArray();
+                }
 
                 case StretchToTotalNode n:
                     return StretchToTotal(EvalTimes(n.Source), n.Total);
@@ -418,6 +477,19 @@ public sealed class ComparisonEvaluator
                             .ToList())
                         .ToArray();
 
+                case ReachedSegmentNode n:
+                {
+                    if (n.Segment > run.SegmentCount)
+                    {
+                        return EvalSamples(n.Source).Select(_ => new List<Sample>()).ToArray();
+                    }
+
+                    IReadOnlyDictionary<int, TimeSpan?> reached = run.Segments[n.Segment - 1].History;
+                    return EvalSamples(n.Source)
+                        .Select(samples => samples.Where(s => reached.ContainsKey(s.AttemptIndex)).ToList())
+                        .ToArray();
+                }
+
                 case AtLeastNode n:
                     return EvalSamples(n.Source)
                         .Select(samples => samples.Count >= n.Count ? samples : new List<Sample>())
@@ -529,6 +601,26 @@ public sealed class ComparisonEvaluator
                 default:
                     throw new ProgramException($"Unsupported aggregate: {kind}.");
             }
+        }
+
+        /// <summary>Newest time weighs 1; weight halves every <paramref name="halfLife"/> older times.</summary>
+        private static TimeSpan? WeightedAverage(List<Sample> samples, int halfLife)
+        {
+            if (samples.Count == 0)
+            {
+                return null;
+            }
+
+            List<Sample> newestFirst = samples.OrderByDescending(s => s.AttemptIndex).ToList();
+            double total = 0, weights = 0;
+            for (int age = 0; age < newestFirst.Count; age++)
+            {
+                double weight = Math.Pow(0.5, (double)age / halfLife);
+                total += newestFirst[age].Time.Ticks * weight;
+                weights += weight;
+            }
+
+            return TimeSpan.FromTicks((long)Math.Round(total / weights));
         }
 
         /// <summary>Linear interpolation between closest ranks (so 50 is exactly the median).</summary>

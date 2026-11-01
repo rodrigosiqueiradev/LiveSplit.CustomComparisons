@@ -34,10 +34,11 @@ public sealed class ComparisonProgram
     /// <summary>
     /// The newest format this build understands. Version 2 added percentile, recentDays,
     /// stretchToTotal, blend and pick; version 3 added trimOutliers, finishedUnder, atLeast
-    /// and attempt. Files are written with the lowest version that can hold their blocks,
+    /// and attempt; version 4 added reachedSegment, weightedAverage, clamp, round and
+    /// bestRecentRun. Files are written with the lowest version that can hold their blocks,
     /// so they open in older builds whenever possible.
     /// </summary>
-    public const int CurrentAstVersion = 3;
+    public const int CurrentAstVersion = 4;
 
     public string Name { get; }
     public TimesNode Root { get; }
@@ -219,6 +220,47 @@ public sealed class AttemptNode : TimesNode
     }
 }
 
+/// <summary>
+/// Keeps only times from attempts that got at least as far as segment <see cref="Segment"/>
+/// (1-based): they have a recorded or skipped time for it. Good for reset-heavy games, where
+/// few runs finish. A segment past the end of the run keeps nothing.
+/// </summary>
+public sealed class ReachedSegmentNode : SamplesNode
+{
+    public SamplesNode Source { get; }
+    public int Segment { get; }
+
+    public ReachedSegmentNode(SamplesNode source, int segment)
+    {
+        if (segment < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(segment), "Segment numbers start at 1.");
+        }
+
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Segment = segment;
+    }
+}
+
+/// <summary>
+/// The segments of the fastest finished attempt that ended within the last <see cref="Days"/>
+/// days: a "recent PB". Empty if no run finished in that time.
+/// </summary>
+public sealed class BestRecentRunNode : TimesNode
+{
+    public int Days { get; }
+
+    public BestRecentRunNode(int days)
+    {
+        if (days < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(days), "Must cover at least one day.");
+        }
+
+        Days = days;
+    }
+}
+
 // ---------------------------------------------------------------- Aggregates
 
 public enum AggregateKind
@@ -266,7 +308,69 @@ public sealed class PercentileNode : TimesNode
     }
 }
 
+/// <summary>
+/// An average where recent times count more: each time's weight halves for every
+/// <see cref="HalfLife"/> newer times recorded for that segment. The newest time weighs 1,
+/// the time HalfLife places older weighs 0.5, and so on.
+/// </summary>
+public sealed class WeightedAverageNode : TimesNode
+{
+    public SamplesNode Source { get; }
+    public int HalfLife { get; }
+
+    public WeightedAverageNode(SamplesNode source, int halfLife)
+    {
+        if (halfLife < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(halfLife), "Must be at least 1.");
+        }
+
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        HalfLife = halfLife;
+    }
+}
+
 // ---------------------------------------------------------------- Math
+
+/// <summary>
+/// Per segment, keeps <see cref="Source"/> between <see cref="Low"/> (never faster than) and
+/// <see cref="High"/> (never slower than). A limit that's empty for a segment doesn't apply
+/// there. If the limits cross, "never faster than" wins. Empty where the source is empty.
+/// </summary>
+public sealed class ClampNode : TimesNode
+{
+    public TimesNode Source { get; }
+    public TimesNode Low { get; }
+    public TimesNode High { get; }
+
+    public ClampNode(TimesNode source, TimesNode low, TimesNode high)
+    {
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Low = low ?? throw new ArgumentNullException(nameof(low));
+        High = high ?? throw new ArgumentNullException(nameof(high));
+    }
+}
+
+/// <summary>
+/// Rounds every segment to the nearest multiple of <see cref="Step"/> (halves round up).
+/// Split times, being sums of segments, then land on the same step.
+/// </summary>
+public sealed class RoundNode : TimesNode
+{
+    public TimesNode Source { get; }
+    public TimeSpan Step { get; }
+
+    public RoundNode(TimesNode source, TimeSpan step)
+    {
+        if (step <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(step), "The step must be positive.");
+        }
+
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Step = step;
+    }
+}
 
 /// <summary>Adds (or, if negative, subtracts) a fixed amount to every non-empty segment.</summary>
 public sealed class AddPerSegmentNode : TimesNode

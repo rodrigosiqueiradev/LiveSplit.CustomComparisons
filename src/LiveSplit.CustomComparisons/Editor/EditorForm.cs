@@ -76,10 +76,16 @@ internal sealed class EditorForm : Form
         }
 
         CoreWebView2 core = webView.CoreWebView2;
-        core.Settings.AreDevToolsEnabled = false;
+#if DEBUG
+        // Debug builds only: F12 opens the browser developer tools on the editor page.
+        bool developing = true;
+#else
+        bool developing = false;
+#endif
+        core.Settings.AreDevToolsEnabled = developing;
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
-        core.Settings.AreBrowserAcceleratorKeysEnabled = false;
+        core.Settings.AreBrowserAcceleratorKeysEnabled = developing;
         core.Settings.IsZoomControlEnabled = false;
 
         core.AddWebResourceRequestedFilter(Origin + "/*", CoreWebView2WebResourceContext.All);

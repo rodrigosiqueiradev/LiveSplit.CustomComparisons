@@ -79,6 +79,26 @@ CI builds that version and, once the tests pass, publishes a GitHub release with
 lands in `Components`, and the user guide, readme, licence and example comparisons in
 `CustomComparisons`.
 
+Building the component also rebuilds the block editor when its sources have changed
+(it needs `npm` on your PATH; pass `-p:BuildEditor=false` to skip that).
+
+### Visual Studio: build, deploy and start LiveSplit with F5
+
+1. Open `LiveSplit.CustomComparisons.sln` (Visual Studio 2022 or later, with the
+   ".NET desktop development" workload) and create `local.props` as above.
+2. Right-click **LiveSplit.CustomComparisons** → **Set as Startup Project**.
+3. Pick **LiveSplit** in the run-button dropdown next to the green ▶ (it's the only profile).
+4. Close LiveSplit if it's running, then press **F5**.
+
+F5 rebuilds what changed (the editor too), copies the DLL and its `.pdb` into
+`LiveSplit\Components`, starts LiveSplit and attaches the debugger, so breakpoints in the
+component work. Stopping the debugger closes LiveSplit. In Debug builds, **F12** in the block
+editor opens the browser developer tools for the editor page.
+
+The copy into `Components` happens on every Visual Studio build. To turn it off, add
+`<DeployToLiveSplit>false</DeployToLiveSplit>` to `local.props`. To keep your normal LiveSplit
+untouched, point `LiveSplitDir` at a second, unzipped copy of LiveSplit just for development.
+
 The component builds into a single `LiveSplit.CustomComparisons.dll`.
 Copy it into `LiveSplit\Components` if you didn't use `DeployToLiveSplit`.
 
@@ -119,19 +139,24 @@ Blocks give either **one time per segment** or **a list of times per segment**:
 | `trimOutliers` ³ | `percent` (0–45, from each end), `source`: list | list |
 | `finishedUnder` ³ | `totalSeconds`, `source`: list | list |
 | `atLeast` ³ | `count` (1–10000), `source`: list | list |
+| `reachedSegment` ⁴ | `segment` (1-based), `source`: list | list |
 | `aggregate` | `kind` (`min` `max` `average` `median`), `source`: list | one |
 | `percentile` ² | `percent` (0–100), `source`: list | one |
+| `weightedAverage` ⁴ | `halfLife` (1–10000 times), `source`: list | one |
 | `comparison` | `name` (any comparison, including your own) | one |
 | `attempt` ³ | `number` (as in LiveSplit's attempt history) | one |
+| `bestRecentRun` ⁴ | `days` (1–36500) | one |
 | `addTime` | `seconds` (±3600), `source`: one | one |
 | `scale` | `percent` (1–1000), `source`: one | one |
 | `stretchToTotal` ² | `totalSeconds` (goal time), `source`: one | one |
 | `blend` ² | `percent` (0–100), `from`: one, `to`: one | one |
 | `pick` ² | `kind` (`faster` `slower`), `first`: one, `second`: one | one |
+| `clamp` ⁴ | `source`: one, `low`: one, `high`: one | one |
+| `round` ⁴ | `step` (seconds, e.g. 0.1), `source`: one | one |
 | `segmentRange` | `cases`: [`{from, to, times}`], `otherwise`: one | one |
 | `fallback` | `primary`: one, `fallback`: one | one |
 
-² Format version 2. ³ Format version 3. Files are written with the lowest version that
+² Format version 2. ³ Format version 3. ⁴ Format version 4. Files are written with the lowest version that
 holds their blocks, so comparisons that don't use newer blocks still open in older releases.
 
 `root` must give one time per segment. Mistakes are reported with their location,
@@ -184,6 +209,14 @@ tests/
   "if empty, use" for "use my median, unless there's too little data".
 - **Attempt #N** is empty where that attempt skipped a split or reset. An attempt number
   that doesn't exist is reported as an error.
+- **Reached segment X** keeps attempts with a recorded or skipped time for segment X.
+- **Recent-weighted average**: the newest time weighs 1, and the weight halves every
+  `halfLife` older times of that segment.
+- **Keep between** (`clamp`) applies "never slower than" then "never faster than", so if
+  the limits cross the lower limit wins. An empty limit doesn't apply to that segment.
+- **Round** rounds each segment to the nearest step (halves up); split times follow.
+- **Best run from the last N days** is the fastest finished attempt that ended in that
+  window, with the attempt's skip rules; empty if none.
 
 ## Roadmap
 

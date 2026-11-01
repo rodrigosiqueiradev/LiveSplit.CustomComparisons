@@ -57,15 +57,41 @@
     </Reference>
   </ItemGroup>
 
+  <PropertyGroup>
+    <EditorDir>$(MSBuildThisFileDirectory)..\..\editor\</EditorDir>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       The block editor page, built from ../../editor with `npm run build`.
       Embedded so the component stays a single DLL. Served from memory, never from disk.
     -->
     <EmbeddedResource Include="EditorDist\**\*" LogicalName="editor/%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <!-- The editor's sources, so changing them rebuilds this project (also in Visual Studio). -->
+    <EditorSource Include="$(EditorDir)src\**\*;$(EditorDir)static\**\*;$(EditorDir)scripts\**\*;$(EditorDir)package.json;$(EditorDir)tsconfig.json" />
+    <UpToDateCheckInput Include="@(EditorSource)" />
   </ItemGroup>
 
-  <Target Name="CheckEditorBuilt" BeforeTargets="BeforeBuild">
+  <!--
+    Rebuilds the block editor when its sources are newer than the built page, so one build
+    (dotnet build, or F5 in Visual Studio) does everything. Needs Node.js (npm) on PATH.
+    Turn it off with -p:BuildEditor=false to build the editor yourself.
+  -->
+  <Target Name="BuildEditor" BeforeTargets="BeforeBuild" Condition="'$(BuildEditor)' != 'false'"
+          Inputs="@(EditorSource)" Outputs="EditorDist\editor.js">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(EditorDir)" Condition="!Exists('$(EditorDir)node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(EditorDir)" />
+    <!-- Pick up files the build just created (the item list above was made before it ran). -->
+    <ItemGroup>
+      <_BuiltEditorFile Include="EditorDist\**\*" />
+      <EmbeddedResource Remove="EditorDist\**\*" />
+      <EmbeddedResource Include="@(_BuiltEditorFile)"
+                        LogicalName="editor/%(_BuiltEditorFile.RecursiveDir)%(_BuiltEditorFile.Filename)%(_BuiltEditorFile.Extension)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CheckEditorBuilt" AfterTargets="BuildEditor" BeforeTargets="BeforeBuild">
     <Error Condition="!Exists('EditorDist\index.html') Or !Exists('EditorDist\editor.js')"
            Text="The block editor hasn't been built. Run: cd editor; npm install; npm run build" />
   </Target>
@@ -78,9 +104,23 @@
     <Compile Include="..\CustomComparisons.Engine\**\*.cs" Exclude="..\CustomComparisons.Engine\obj\**;..\CustomComparisons.Engine\bin\**" LinkBase="Engine" />
   </ItemGroup>
 
-  <!-- Optional: dotnet build -p:DeployToLiveSplit=true copies the DLL into LiveSplit's Components folder. -->
+  <!--
+    Copies the DLL (and its .pdb, for breakpoints) into LiveSplit's Components folder.
+    On by default when building in Visual Studio, so F5 runs LiveSplit with the fresh build
+    (see Properties\launchSettings.json). Elsewhere: dotnet build -p:DeployToLiveSplit=true.
+    Set DeployToLiveSplit to false in local.props to turn it off.
+  -->
+  <PropertyGroup>
+    <DeployToLiveSplit Condition="'$(DeployToLiveSplit)' == '' And '$(BuildingInsideVisualStudio)' == 'true'">true</DeployToLiveSplit>
+  </PropertyGroup>
   <Target Name="DeployToLiveSplit" AfterTargets="Build" Condition="'$(DeployToLiveSplit)' == 'true'">
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(LiveSplitDir)\Components" />
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)$(TargetName).pdb" DestinationFolder="$(LiveSplitDir)\Components"
+          SkipUnchangedFiles="true" Retries="1" RetryDelayMilliseconds="500" ContinueOnError="true">
+      <Output TaskParameter="CopiedFiles" ItemName="DeployedFiles" />
+    </Copy>
+    <Error Condition="'$(MSBuildLastTaskResult)' == 'false'"
+           Text="Couldn't copy the component into '$(LiveSplitDir)\Components'. Is LiveSplit still running? Close it and build again." />
+    <Message Importance="high" Condition="'@(DeployedFiles)' != ''" Text="Deployed to $(LiveSplitDir)\Components" />
   </Target>
 
 </Project>

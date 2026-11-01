@@ -96,6 +96,35 @@ function createSampleHost(): Host {
         const slower = node.kind === "slower";
         return a.map((t, i) => (t === null ? b[i] : b[i] === null ? t : slower ? Math.max(t, b[i] as number) : Math.min(t, b[i] as number)));
       }
+      case "bestRecentRun":
+        return [...pb];
+      case "weightedAverage":
+        return history.map((xs, i) => {
+          if (i === segments.length - 1) return null;
+          let total = 0, weights = 0;
+          [...xs].reverse().forEach((t, age) => {
+            const w = Math.pow(0.5, age / Number(node.halfLife));
+            total += t * w;
+            weights += w;
+          });
+          return total / weights;
+        });
+      case "clamp": {
+        const src = evalTimes(node.source as AstNode);
+        const lo = evalTimes(node.low as AstNode);
+        const hi = evalTimes(node.high as AstNode);
+        return src.map((t, i) => {
+          if (t === null) return null;
+          let v = t;
+          if (hi[i] !== null && v > (hi[i] as number)) v = hi[i] as number;
+          if (lo[i] !== null && v < (lo[i] as number)) v = lo[i] as number;
+          return v;
+        });
+      }
+      case "round": {
+        const step = Number(node.step) * 1000;
+        return evalTimes(node.source as AstNode).map((t) => (t === null ? null : Math.floor((t + step / 2) / step) * step));
+      }
       case "addTime":
         return evalTimes(node.source as AstNode).map((t) => (t === null ? null : Math.max(0, t + Number(node.seconds) * 1000)));
       case "scale":

@@ -195,6 +195,7 @@ The two coloured shapes above the canvas are a reminder of which is which.
 | **all my times for each segment** ⬡ | Every time you've recorded for each segment. Skipped segments (and the combined segment right after a skip) are left out. |
 | **comparison** ⬭ | An existing comparison, like *Personal Best*, *Best Segments* or one of your own custom comparisons. LiveSplit's built-in ones work even if you've switched them off. |
 | **attempt #** ⬭ | One specific past attempt, by its number in LiveSplit's attempt history. Empty where that run skipped a split or reset. |
+| **my best run from the last N days** ⬭ | Your fastest finished run from that period: a "recent PB" that moves as you play. Empty if no run finished in that time. |
 
 ### Filters: choose which runs count (list in, list out)
 
@@ -203,6 +204,7 @@ The two coloured shapes above the canvas are a reminder of which is which.
 | **last N times of** | Keeps only the N most recent times for each segment. It counts times you completed that segment, not attempts. |
 | **from completed runs only** | Keeps only times from attempts where you finished the whole run. |
 | **from the last N days** | Keeps only times from the last N days, so old times stop counting. |
+| **from runs that reached** | Keeps only times from attempts that got at least as far as the segment you pick. Like *from completed runs only*, but for games where most runs reset early. |
 | **from runs that finished under** | Keeps only times from runs that finished faster than a time you type (like `20:00`), so only your good runs count. |
 | **drop the fastest and slowest N % of** | Removes flukes: drops that share of each segment's fastest and slowest times. With only a few times, nothing is dropped. |
 | **only if there are at least N times in** | If a segment has fewer than N times, it's left empty, so you're not trusting too little data. Pair it with **if empty, use** to fill those gaps. |
@@ -216,6 +218,7 @@ The two coloured shapes above the canvas are a reminder of which is which.
 | **best (min) of** | Your fastest time in the list. |
 | **worst (max) of** | Your slowest time in the list. |
 | **percentile N of** | 0 = your fastest, 100 = your slowest, 50 = the median. **70** means "a time I beat about 70 % of the time." |
+| **recent-weighted average of** | An average where recent times count more. With *weight halves every 5 older times*, your newest time counts fully, the one 5 times older counts half, 10 times older a quarter, and so on. Follows your current form without a hard cut-off like *last 10*. |
 
 ### Math: adjust one time per segment (one time in, one time out)
 
@@ -223,6 +226,8 @@ The two coloured shapes above the canvas are a reminder of which is which.
 |---|---|
 | **add N s per segment to** | Adds that many seconds to every segment. Use a negative number to take time off. Never goes below zero. |
 | **N % of** | Scales every segment. **103 %** is 3 % slower, **97 %** is 3 % faster. |
+| **round to** | Rounds every segment to the nearest 0.1 s (or 1 s, 0.01 s), so your split targets are tidy numbers. |
+| **keep … never faster than … never slower than …** | Holds each segment between two limits, for example never faster than your golds and never slower than your PB. If the limits cross, *never faster than* wins. |
 | **stretch to finish in** | Speeds up or slows down every segment by the same amount so the whole run adds up to exactly the goal time you type (like `19:59.9`). |
 | **N % of the way from … to …** | Mixes two comparisons. 0 % is all the first, 100 % all the second, 75 % is three quarters of the way. Great for "somewhere between my golds and my PB". |
 
@@ -300,6 +305,28 @@ this comparison is
 this comparison is
   the slower of  add 1 s per segment to (comparison "Best Segments")
           and    median of (all my times for each segment)
+```
+
+**Current form, kept realistic and tidy.** Recent runs count most, the result never goes
+below your golds or above your recent best run, and the times are rounded to 0.1 s.
+
+```
+this comparison is
+  round to 0.1 s
+    keep               recent-weighted average of (all my times for each segment)
+                         weight halves every 5 older times
+    never faster than  comparison "Best Segments"
+    never slower than  my best run from the last 30 days
+```
+
+**For reset-heavy games.** The median of runs that made it at least to the Castle, so
+early resets don't drag the early segments down.
+
+```
+this comparison is
+  median of
+    from runs that reached 4. Castle
+      all my times for each segment
 ```
 
 ---

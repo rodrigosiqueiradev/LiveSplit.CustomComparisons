@@ -44,6 +44,9 @@ function describeSamples(node: AstNode): string {
       case "atLeast":
         qualifiers.push(`when there are at least ${current.count}`);
         break;
+      case "reachedSegment":
+        qualifiers.push(`from runs that reached ${segmentLabel(Number(current.segment))}`);
+        break;
     }
 
     current = current.source as AstNode | undefined;
@@ -60,6 +63,14 @@ function describeTimes(node: AstNode): string {
       return node.name === "Best Segments" ? "your golds" : node.name === "Personal Best" ? "your PB" : `"${node.name}"`;
     case "attempt":
       return `attempt #${node.number}`;
+    case "bestRecentRun":
+      return `your best run from the last ${node.days} days`;
+    case "weightedAverage":
+      return `the recent-weighted average of ${describeSamples(node.source as AstNode)}`;
+    case "clamp":
+      return `${describeTimes(node.source as AstNode)}, kept between ${describeTimes(node.low as AstNode)} and ${describeTimes(node.high as AstNode)}`;
+    case "round":
+      return `${describeTimes(node.source as AstNode)}, rounded to ${seconds(Number(node.step))}`;
     case "aggregate": {
       const kind = ({ median: "the median", average: "the average", min: "the best", max: "the worst" } as Record<string, string>)[String(node.kind)];
       return `${kind} of ${describeSamples(node.source as AstNode)}`;
@@ -121,6 +132,8 @@ function describeOrigin(root: AstNode, path: string): string {
     const parent = node as AstNode;
     if (parent.type === "fallback" && step === "fallback") notes.push("filling a gap");
     if (parent.type === "pick") notes.push(`the ${parent.kind} of the two`);
+    if (parent.type === "clamp" && step === "low") notes.push("held at the \"never faster than\" limit");
+    if (parent.type === "clamp" && step === "high") notes.push("held at the \"never slower than\" limit");
     node = Array.isArray(node) ? (node as unknown[])[Number(step)] : (node as Record<string, unknown>)[step];
     if (node === undefined) return "";
   }

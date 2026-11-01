@@ -110,6 +110,16 @@ public static class ProgramSerializer
                 return Typed("blend").Add("percent", n.Percent).Add("from", WriteNode(n.From)).Add("to", WriteNode(n.To));
             case PickNode n:
                 return Typed("pick").Add("kind", n.Kind == PickKind.Faster ? "faster" : "slower").Add("first", WriteNode(n.First)).Add("second", WriteNode(n.Second));
+            case ReachedSegmentNode n:
+                return Typed("reachedSegment").Add("segment", n.Segment).Add("source", WriteNode(n.Source));
+            case BestRecentRunNode n:
+                return Typed("bestRecentRun").Add("days", n.Days);
+            case WeightedAverageNode n:
+                return Typed("weightedAverage").Add("halfLife", n.HalfLife).Add("source", WriteNode(n.Source));
+            case ClampNode n:
+                return Typed("clamp").Add("source", WriteNode(n.Source)).Add("low", WriteNode(n.Low)).Add("high", WriteNode(n.High));
+            case RoundNode n:
+                return Typed("round").Add("step", Math.Round(n.Step.TotalSeconds, 3)).Add("source", WriteNode(n.Source));
             case SegmentRangeSwitchNode n:
                 return Typed("segmentRange")
                     .Add("cases", new JsonArray(n.Cases.Select(c => (JsonValue)new JsonObject()
@@ -129,6 +139,16 @@ public static class ProgramSerializer
     {
         switch (node)
         {
+            case BestRecentRunNode:
+                return 4;
+            case ReachedSegmentNode n:
+                return Math.Max(4, RequiredVersion(n.Source));
+            case WeightedAverageNode n:
+                return Math.Max(4, RequiredVersion(n.Source));
+            case RoundNode n:
+                return Math.Max(4, RequiredVersion(n.Source));
+            case ClampNode n:
+                return Math.Max(4, Math.Max(RequiredVersion(n.Source), Math.Max(RequiredVersion(n.Low), RequiredVersion(n.High))));
             case AttemptNode:
                 return 3;
             case TrimOutliersNode n:
@@ -325,14 +345,37 @@ public static class ProgramSerializer
                     ReadTimes(Required(obj, "second", path), Join(path, "second")));
             }
 
+            case "bestRecentRun":
+                return new BestRecentRunNode(ReadInt(obj, "days", path, 1, MaxDays));
+
+            case "weightedAverage":
+                return new WeightedAverageNode(
+                    ReadSamples(Required(obj, "source", path), Join(path, "source")),
+                    ReadInt(obj, "halfLife", path, 1, MaxCount));
+
+            case "clamp":
+                return new ClampNode(
+                    ReadTimes(Required(obj, "source", path), Join(path, "source")),
+                    ReadTimes(Required(obj, "low", path), Join(path, "low")),
+                    ReadTimes(Required(obj, "high", path), Join(path, "high")));
+
+            case "round":
+            {
+                double step = ReadNumber(obj, "step", path, 0.001, MaxSeconds);
+                return new RoundNode(
+                    ReadTimes(Required(obj, "source", path), Join(path, "source")),
+                    TimeSpan.FromTicks((long)Math.Round(step * TimeSpan.TicksPerSecond)));
+            }
+
             case "segmentHistory":
             case "lastN":
+            case "reachedSegment":
             case "completedRunsOnly":
             case "recentDays":
             case "trimOutliers":
             case "finishedUnder":
             case "atLeast":
-                throw new ProgramFormatException($"{path}: \"{type}\" gives a list of times per segment. Put it inside a min, max, average, median or percentile block.");
+                throw new ProgramFormatException($"{path}: \"{type}\" gives a list of times per segment. Put it inside a min, max, average, median, percentile or weighted average block.");
 
             default:
                 throw new ProgramFormatException($"{path}: unknown block \"{type}\".");
@@ -362,9 +405,15 @@ public static class ProgramSerializer
                 double limit = ReadNumber(obj, "totalSeconds", path, 0.001, MaxTotalSeconds);
                 return new FinishedUnderNode(source, TimeSpan.FromTicks((long)Math.Round(limit * TimeSpan.TicksPerSecond)));
             }
+            case "reachedSegment":
+                return new ReachedSegmentNode(ReadSamples(Required(obj, "source", path), Join(path, "source")), ReadInt(obj, "segment", path, 1, MaxSegment));
             case "atLeast":
                 return new AtLeastNode(ReadSamples(Required(obj, "source", path), Join(path, "source")), ReadInt(obj, "count", path, 1, MaxCount));
             case "attempt":
+            case "bestRecentRun":
+            case "weightedAverage":
+            case "clamp":
+            case "round":
             case "comparison":
             case "aggregate":
             case "percentile":
