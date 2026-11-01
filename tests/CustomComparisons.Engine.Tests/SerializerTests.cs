@@ -95,7 +95,7 @@ public class SerializerTests
         Assert.Contains("needs a list of times", message);
 
         // And a list of times can't be the result on its own.
-        Assert.Contains("Put it inside a min, max, average, median or percentile block", ErrorFor(Wrap("{\"type\":\"segmentHistory\"}")));
+        Assert.Contains("Put it inside a min, max, average, median, percentile or weighted average block", ErrorFor(Wrap("{\"type\":\"segmentHistory\"}")));
     }
 
     [Theory]
