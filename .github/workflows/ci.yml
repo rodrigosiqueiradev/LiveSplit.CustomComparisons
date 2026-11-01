@@ -40,6 +40,9 @@ jobs:
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $version = $env:GITHUB_REF_NAME.TrimStart('v')
             if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Release tags look like v1.2.3, not '$env:GITHUB_REF_NAME'." }
+            if (-not (Select-String -Path CHANGELOG.md -Pattern "^##\s+v?$([regex]::Escape($version))\s*$" -Quiet)) {
+              throw "CHANGELOG.md has no '## $version' section. Add one, then tag again."
+            }
             "msbuild=-p:Version=$version" | Out-File $env:GITHUB_OUTPUT -Append
           } else {
             $version = "ci-$env:GITHUB_RUN_NUMBER"
@@ -118,9 +121,18 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.component.outputs.package }}
+      # LiveSplit's updater reads update.LiveSplit.CustomComparisons.xml from the latest
+      # release and downloads the plain DLL next to it, so both are attached to every release.
+      - name: Make the update files
+        run: |
+          python3 scripts/release-files.py "$GITHUB_REF_NAME" release
+          unzip -j "${{ needs.component.outputs.package }}.zip" Components/LiveSplit.CustomComparisons.dll -d release
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "${{ needs.component.outputs.package }}.zip" \
-            --title "Custom Comparisons $GITHUB_REF_NAME" --generate-notes --verify-tag
+          gh release create "$GITHUB_REF_NAME" --verify-tag --latest \
+            --title "Custom Comparisons $GITHUB_REF_NAME" --notes-file release/release-notes.md \
+            "${{ needs.component.outputs.package }}.zip" \
+            release/LiveSplit.CustomComparisons.dll \
+            release/update.LiveSplit.CustomComparisons.xml

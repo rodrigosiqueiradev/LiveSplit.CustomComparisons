@@ -44,6 +44,10 @@ Segment, and so on).
      comparisons you can import.
 4. Start LiveSplit again.
 
+**Updates come by themselves.** When a new version is out, LiveSplit tells you when it
+starts, shows what changed, and offers to install it. Say yes and it restarts with the new
+version. Your comparisons are kept: they live in your layout, not in the component.
+
 You need Windows 10 or 11. The block editor uses Microsoft Edge WebView2, which Windows
 already includes.
 

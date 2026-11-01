@@ -74,10 +74,16 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
+Before tagging, add a `## 0.2.0` section to [`CHANGELOG.md`](CHANGELOG.md) with one `- ` line
+per change, written for runners. CI refuses to release a version that has no section.
+
 CI builds that version and, once the tests pass, publishes a GitHub release with
 `LiveSplit.CustomComparisons-0.2.0.zip` attached. Unzip it into the LiveSplit folder: the DLL
 lands in `Components`, and the user guide, readme, licence and example comparisons in
-`CustomComparisons`.
+`CustomComparisons`. The release also carries the plain DLL and
+`update.LiveSplit.CustomComparisons.xml`, which LiveSplit's own updater reads from the latest
+release, so runners are offered the update (with its changelog) when they start LiveSplit.
+This needs the repository to be public.
 
 Building the component also rebuilds the block editor when its sources have changed
 (it needs `npm` on your PATH; pass `-p:BuildEditor=false` to skip that).
