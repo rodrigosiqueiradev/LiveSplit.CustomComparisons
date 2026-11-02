@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Settings>
+  <Version>2</Version>
+  <Comparisons>
+    <Comparison>{"format":"livesplit-custom-comparison","version":1,"name":"Kept","root":{"type":"comparison","name":"Personal Best"}}</Comparison>
+    <Comparison>{"format":"livesplit-custom-comparison","version":99,"name":"Future Pace","marker":"keep-this-verbatim"}</Comparison>
+  </Comparisons>
+</Settings>

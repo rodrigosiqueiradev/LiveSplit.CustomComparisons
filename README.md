@@ -56,13 +56,16 @@ in the repository root. It's git-ignored, so it stays on your machine:
 # Engine tests only (also run on macOS/Linux)
 dotnet test tests/CustomComparisons.Engine.Tests
 
+# LiveSplit fixture tests (Windows only; needs the LiveSplit install above)
+dotnet test tests/LiveSplit.CustomComparisons.Tests
+
 # Component, optionally copied straight into LiveSplit\Components
 dotnet build src/LiveSplit.CustomComparisons -c Release -p:DeployToLiveSplit=true
 ```
 
 CI runs on every push (and on demand from the Actions tab): the engine tests on Linux, and
-on Windows the editor plus the component, compiled against the official LiveSplit release it
-downloads. Each run's summary page has a package to download.
+on Windows the editor, the component, and the LiveSplit fixture tests, compiled against the
+official LiveSplit release it downloads. Each run's summary page has a package to download.
 
 ### Releasing
 
@@ -188,7 +191,8 @@ src/
     Editor/                      WebView2 window and the bridge that answers the editor.
 editor/                          The block editor (TypeScript + Blockly), built into EditorDist/.
 tests/
-  CustomComparisons.Engine.Tests xUnit tests for the engine.
+  CustomComparisons.Engine.Tests   xUnit tests for the engine. No LiveSplit dependency.
+  LiveSplit.CustomComparisons.Tests  Windows-only. Loads checked-in .lss fixtures through LiveSplit.
 ```
 
 ### Semantics

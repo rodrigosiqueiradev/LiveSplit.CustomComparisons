@@ -1,0 +1,68 @@
+<Project>
+
+  <!--
+    Set before the SDK import. The default output path sits past MAX_PATH in a deep checkout,
+    and the .NET Framework test host then fails to load xunit. bin/ and obj/ at the repo root
+    stay under the limit.
+  -->
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\bin\lss-tests\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\obj\lss-tests\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <!-- Same framework as the component. Windows-only: it references LiveSplit.Core. -->
+    <TargetFramework>net481</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>LiveSplit.CustomComparisons.Tests</RootNamespace>
+    <!-- testhost.exe needs the redirects the component's LiveSplit references imply. -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <Import Project="..\..\local.props" Condition="Exists('..\..\local.props')" />
+  <PropertyGroup>
+    <LiveSplitDir Condition="'$(LiveSplitDir)' == ''">$(LIVESPLIT_DIR)</LiveSplitDir>
+  </PropertyGroup>
+
+  <Target Name="CheckLiveSplitDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(LiveSplitDir)' == '' Or !Exists('$(LiveSplitDir)\LiveSplit.Core.dll')"
+           Text="Can't find LiveSplit (looked in '$(LiveSplitDir)'). Point LiveSplitDir at the folder containing LiveSplit.exe: see 'Build' in README.md." />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LiveSplit.CustomComparisons\LiveSplit.CustomComparisons.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- LiveSplit.Core's own dependencies are not copied by the component (Private=false). -->
+    <Reference Include="LiveSplit.Core">
+      <HintPath>$(LiveSplitDir)\LiveSplit.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <None Include="$(LiveSplitDir)\*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+    <!-- RunFactory parses .lss through the native livesplit_core build. Pick the folder at runtime. -->
+    <None Include="$(LiveSplitDir)\x64\livesplit_core.dll" CopyToOutputDirectory="PreserveNewest" Link="native\x64\livesplit_core.dll" />
+    <None Include="$(LiveSplitDir)\x86\livesplit_core.dll" CopyToOutputDirectory="PreserveNewest" Link="native\x86\livesplit_core.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+</Project>

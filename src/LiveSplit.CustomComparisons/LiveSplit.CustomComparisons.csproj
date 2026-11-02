@@ -12,6 +12,10 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="LiveSplit.CustomComparisons.Tests" />
+  </ItemGroup>
+
   <!--
     Where your LiveSplit install lives (the folder with LiveSplit.exe), in order of preference:
       1. dotnet build -p:LiveSplitDir="D:\Tools\LiveSplit"
