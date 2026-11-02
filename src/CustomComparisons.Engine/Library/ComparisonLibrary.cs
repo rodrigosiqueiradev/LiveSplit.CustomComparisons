@@ -133,11 +133,87 @@ public sealed class ComparisonLibrary
             return problem;
         }
 
-        ComparisonProgram old = entry.Document.Program;
-        var renamed = new ProgramDocument(new ComparisonProgram(newName.Trim(), old.Root), entry.Document.Workspace);
-        entries[index] = StoredComparison.FromDocument(renamed);
-        RecheckDuplicates();
+        string oldName = entry.Document.Program.Name;
+        string trimmed = newName.Trim();
+        if (trimmed == oldName)
+        {
+            return null;
+        }
+
+        // Build the whole list first. Load replaces everything at once, so a failure
+        // while rewriting a dependent leaves the library exactly as it was.
+        var saved = new string[entries.Count];
+        try
+        {
+            for (int i = 0; i < entries.Count; i++)
+            {
+                StoredComparison current = entries[i];
+                bool rewritten = false;
+                if (i == index)
+                {
+                    ComparisonProgram program = current.Document.Program;
+                    saved[i] = ProgramSerializer.Write(
+                        new ProgramDocument(new ComparisonProgram(trimmed, program.Root, program.AstVersion), current.Document.Workspace),
+                        indented: false);
+                    rewritten = true;
+                }
+                else if (!current.IsReadable || !ComparisonReferences.Uses(current.Document.Program.Root, oldName))
+                {
+                    // Unreadable entries stay byte for byte. So do readable ones that
+                    // don't mention this name, workspace included.
+                    saved[i] = current.Json;
+                }
+                else
+                {
+                    ComparisonProgram program = current.Document.Program;
+                    var updated = new ProgramDocument(
+                        new ComparisonProgram(program.Name, ComparisonReferences.Rewrite(program.Root, oldName, trimmed), program.AstVersion),
+                        ComparisonReferences.RewriteWorkspace(current.Document.Workspace, oldName, trimmed));
+                    saved[i] = ProgramSerializer.Write(updated, indented: false);
+                    rewritten = true;
+                }
+
+                if (rewritten && !StoredComparison.Load(saved[i]).IsReadable)
+                {
+                    return "Couldn't update the comparisons that use this one, so nothing was renamed.";
+                }
+            }
+        }
+        catch (ArgumentException)
+        {
+            return "Couldn't update the comparisons that use this one, so nothing was renamed.";
+        }
+
+        Load(saved);
         return null;
+    }
+
+    /// <summary>
+    /// How many readable programs, other than <paramref name="excluding"/>, use
+    /// <paramref name="name"/> in a comparison block. Unreadable entries are skipped.
+    /// </summary>
+    public int CountUsers(string name, StoredComparison excluding = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        foreach (StoredComparison candidate in entries)
+        {
+            if (ReferenceEquals(candidate, excluding) || !candidate.IsReadable)
+            {
+                continue;
+            }
+
+            if (ComparisonReferences.Uses(candidate.Document.Program.Root, name))
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     /// <summary>

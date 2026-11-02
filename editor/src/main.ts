@@ -3,6 +3,12 @@
 interface Tab {
   /** The name this program had when the editor opened; null for programs made here. */
   originalName: string | null;
+  /**
+   * The name comparison blocks still use. Stays put while the name box is edited, and
+   * catches up in save() (and when leaving the tab) so Ctrl+S rewrites references
+   * even though it never blurs the box.
+   */
+  propagatedName: string;
   name: string;
   /** Blockly workspace JSON. Kept current for inactive tabs; the active tab lives in the workspace. */
   state: object;
@@ -111,7 +117,6 @@ function start(): void {
   ui.duplicate.addEventListener("click", duplicateTab);
   ui.remove.addEventListener("click", deleteTab);
   ui.name.addEventListener("input", onNameInput);
-  ui.name.addEventListener("change", onNameCommitted);
   ui.save.addEventListener("click", save);
   ui.cancel.addEventListener("click", cancel);
   for (const button of ui.timingButtons) {
@@ -134,7 +139,7 @@ function onHostMessage(message: HostMessage): void {
       init = message;
       segmentNames.splice(0, segmentNames.length, ...message.segments);
       comparisonChoices.fromHost = message.comparisons;
-      tabs = message.programs.map((p) => ({ originalName: p.name, name: p.name, state: stateFor(p.doc) }));
+      tabs = message.programs.map((p) => ({ originalName: p.name, name: p.name, propagatedName: p.name, state: stateFor(p.doc) }));
       setTimingMethod(message.timingMethod, false);
       renderTabs();
       selectTab(Math.max(0, tabs.findIndex((t) => t.name === message.initialProgram)));
@@ -194,6 +199,8 @@ function renderTabs(): void {
 
 function selectTab(index: number): void {
   storeActiveTab();
+  // Leaving a tab is a commit point, so the tab you land on already shows the new name.
+  commitComparisonRenames();
   active = tabs.length === 0 ? -1 : Math.min(index, tabs.length - 1);
   if (active >= 0) {
     loadIntoWorkspace(tabs[active].state, tabs[active].undo, tabs[active].redo);
@@ -253,7 +260,8 @@ function showResultBlock(): void {
 
 function addTab(fromState: object | null, baseName = "New Comparison"): void {
   storeActiveTab();
-  tabs.push({ originalName: null, name: freeName(baseName), state: fromState ?? emptyWorkspaceState() });
+  const name = freeName(baseName);
+  tabs.push({ originalName: null, name, propagatedName: name, state: fromState ?? emptyWorkspaceState() });
   markDirty();
   selectTab(tabs.length - 1);
   ui.name.focus();
@@ -275,7 +283,14 @@ function deleteTab(): void {
     return;
   }
 
-  if (!confirm(`Delete "${tabs[active].name}"? You can still cancel the editor to undo this.`)) {
+  const name = tabs[active].name.trim() || "(unnamed)";
+  const users = usersOf(active);
+  const usage = users === 1
+    ? "1 comparison uses this one, and it will stop working. "
+    : users > 1
+      ? `${users} comparisons use this one, and they will stop working. `
+      : "";
+  if (!confirm(`Delete "${name}"? ${usage}You can still cancel the editor to undo this.`)) {
     return;
   }
 
@@ -323,46 +338,117 @@ function onNameInput(): void {
   renderTabs();
 }
 
-/** When a program is renamed, comparison blocks in other tabs that used the old name follow it. */
-let nameBeforeEdit = "";
-ui.name.addEventListener("focus", () => (nameBeforeEdit = ui.name.value.trim()));
-
-function onNameCommitted(): void {
-  const oldName = nameBeforeEdit;
-  const newName = ui.name.value.trim();
-  nameBeforeEdit = newName;
-  if (active < 0 || !oldName || oldName === newName || nameProblem(newName, active)) {
-    return;
-  }
-
-  tabs.forEach((tab, i) => {
-    if (i !== active) {
-      tab.state = renameComparisonUses(tab.state, oldName, newName);
+/**
+ * Points comparison blocks at the names as they are now. One pass, so swapping
+ * two names doesn't rewrite a block twice. A tab's own blocks are left alone:
+ * only other tabs were using the old name.
+ * Returns whether the open tab's saved state changed and must be reloaded.
+ */
+function commitComparisonRenames(): boolean {
+  const renames: { index: number; from: string; to: string }[] = [];
+  tabs.forEach((tab, index) => {
+    const from = tab.propagatedName.trim();
+    const to = tab.name.trim();
+    if (from && from !== to && nameProblem(to, index) === null) {
+      renames.push({ index, from, to });
     }
   });
-  comparisonChoices.extra.add(newName);
-  refreshEditorChoices();
-  refreshCompareOptions();
+  if (renames.length === 0) return false;
+
+  let activeChanged = false;
+  tabs.forEach((tab, index) => {
+    const map = new Map(renames.filter((rename) => rename.index !== index).map((rename) => [rename.from, rename.to]));
+    const next = renameComparisonUses(tab.state, map);
+    if (next !== tab.state) {
+      tab.state = next;
+      if (index === active) activeChanged = true;
+    }
+  });
+
+  for (const rename of renames) {
+    tabs[rename.index].propagatedName = rename.to;
+    comparisonChoices.extra.add(rename.to);
+  }
+
+  return activeChanged;
 }
 
-function renameComparisonUses(state: object, oldName: string, newName: string): object {
+/** How many other tabs' blocks still name this tab, under its current or not-yet-saved name. */
+function usersOf(index: number): number {
+  const names = new Set([tabs[index].propagatedName.trim(), tabs[index].name.trim()].filter(Boolean));
+  let count = 0;
+  tabs.forEach((tab, i) => {
+    if (i === index) return;
+    for (const name of names) {
+      if (stateUsesComparison(tab.state, name)) {
+        count += 1;
+        break;
+      }
+    }
+  });
+  return count;
+}
+
+function stateUsesComparison(state: object, name: string): boolean {
+  let found = false;
+  const walk = (value: unknown): void => {
+    if (found || value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      const fields = obj.fields as Record<string, unknown> | undefined;
+      if (obj.type === BLOCK.comparison && fields?.NAME === name) {
+        found = true;
+        return;
+      }
+      Object.values(obj).forEach(walk);
+    }
+  };
+  walk(state);
+  return found;
+}
+
+function renameComparisonUses(state: object, renames: Map<string, string>): object {
+  if (renames.size === 0) return state;
+  let changed = false;
   const walk = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(walk);
+    if (Array.isArray(value)) {
+      let arrayChanged = false;
+      const next = value.map((item) => {
+        const child = walk(item);
+        if (child !== item) arrayChanged = true;
+        return child;
+      });
+      if (!arrayChanged) return value;
+      changed = true;
+      return next;
+    }
     if (value && typeof value === "object") {
       const obj = value as Record<string, unknown>;
+      let objectChanged = false;
       const copy: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(obj)) copy[k] = walk(v);
-      const fields = copy.fields as Record<string, unknown> | undefined;
-      if (copy.type === BLOCK.comparison && fields?.NAME === oldName) {
-        copy.fields = { ...fields, NAME: newName };
+      for (const [k, v] of Object.entries(obj)) {
+        const child = walk(v);
+        if (child !== v) objectChanged = true;
+        copy[k] = child;
       }
-
+      const fields = copy.fields as Record<string, unknown> | undefined;
+      const renamed = fields && typeof fields.NAME === "string" ? renames.get(fields.NAME) : undefined;
+      if (copy.type === BLOCK.comparison && renamed !== undefined && fields) {
+        copy.fields = { ...fields, NAME: renamed };
+        objectChanged = true;
+      }
+      if (!objectChanged) return value;
+      changed = true;
       return copy;
     }
-
     return value;
   };
-  return walk(state) as object;
+  const result = walk(state);
+  return changed ? (result as object) : state;
 }
 
 function showNameError(): void {
@@ -778,7 +864,12 @@ function updateButtons(): void {
 
 function save(): void {
   if (ui.save.disabled) return;
+  if (active >= 0) tabs[active].name = ui.name.value;
   storeActiveTab();
+  // Ctrl+S does not blur the name box, so the rewrite has to happen here.
+  if (commitComparisonRenames() && active >= 0) {
+    loadIntoWorkspace(tabs[active].state, tabs[active].undo, tabs[active].redo);
+  }
 
   const programs: SaveRequest["programs"] = [];
   for (let i = 0; i < tabs.length; i++) {

@@ -388,9 +388,10 @@ internal sealed class SettingsControl : UserControl
             return;
         }
 
+        int users = component.Library.CountUsers(entry.Name, entry);
         DialogResult answer = MessageBox.Show(
             this,
-            $"Delete \"{entry.Name}\"? Export it first if you might want it back.",
+            DeleteMessage(entry.Name, users),
             "Delete comparison",
             MessageBoxButtons.OKCancel,
             MessageBoxIcon.Warning,
@@ -404,6 +405,17 @@ internal sealed class SettingsControl : UserControl
 
     private void ShowError(string title, string message) =>
         MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+    /// <summary>Warns when other comparisons will go blank because they use this one.</summary>
+    private static string DeleteMessage(string name, int users)
+    {
+        string usage = users == 1
+            ? " 1 comparison uses this one, and it will stop working."
+            : users > 1
+                ? $" {users} comparisons use this one, and they will stop working."
+                : "";
+        return $"Delete \"{name}\"?{usage} Export it first if you might want it back.";
+    }
 
     private static string SafeFileName(string name)
     {
