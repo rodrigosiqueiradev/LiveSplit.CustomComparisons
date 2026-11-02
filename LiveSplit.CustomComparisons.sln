@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LiveSplit.CustomComparisons
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomComparisons.Engine.Tests", "tests\CustomComparisons.Engine.Tests\CustomComparisons.Engine.Tests.csproj", "{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F03}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LiveSplit.CustomComparisons.Tests", "tests\LiveSplit.CustomComparisons.Tests\LiveSplit.CustomComparisons.Tests.csproj", "{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F04}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,5 +29,9 @@ Global
 		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F03}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F03}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B1E5C2A-6F0D-4C1B-9E2A-1A0C7D4E5F04}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

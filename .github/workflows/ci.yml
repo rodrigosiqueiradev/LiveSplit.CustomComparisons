@@ -109,10 +109,56 @@ jobs:
           path: ${{ steps.version.outputs.package }}.zip
           if-no-files-found: error
 
+  # Separate from the engine job: these tests reference LiveSplit.Core and run on Windows only.
+  # The engine suite stays `dotnet test tests/CustomComparisons.Engine.Tests` on Linux.
+  livesplit-tests:
+    name: LiveSplit fixture tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+      - name: Build the block editor
+        working-directory: editor
+        run: |
+          npm ci
+          npm run build
+
+      - name: Cache LiveSplit
+        id: livesplit-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/LiveSplit
+          key: livesplit-${{ env.LIVESPLIT_VERSION }}
+      - name: Download LiveSplit
+        if: steps.livesplit-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'LiveSplit.zip'
+          Invoke-WebRequest "https://github.com/LiveSplit/LiveSplit/releases/download/$env:LIVESPLIT_VERSION/LiveSplit_$env:LIVESPLIT_VERSION.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'LiveSplit')
+      - name: Find LiveSplit
+        shell: pwsh
+        run: |
+          $core = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'LiveSplit') -Recurse -Filter LiveSplit.Core.dll | Select-Object -First 1
+          if (-not $core) { throw "LiveSplit.Core.dll not found in the LiveSplit $env:LIVESPLIT_VERSION download." }
+          "LIVESPLIT_DIR=$($core.DirectoryName)" | Out-File $env:GITHUB_ENV -Append
+          Write-Host "LiveSplit found in $($core.DirectoryName)"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+      - name: Run the LiveSplit fixture tests
+        run: dotnet test tests/LiveSplit.CustomComparisons.Tests --nologo -p:BuildEditor=false
+
   release:
     name: GitHub release
     if: github.ref_type == 'tag'
-    needs: [engine, component]
+    needs: [engine, component, livesplit-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write

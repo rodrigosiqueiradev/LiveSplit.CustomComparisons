@@ -16,6 +16,9 @@ $log = Join-Path $PSScriptRoot 'build-log.txt'
     Write-Output '=== dotnet test (engine)'
     dotnet test tests/CustomComparisons.Engine.Tests --nologo -v minimal
     Write-Output "=== test exit code: $LASTEXITCODE"
+    Write-Output '=== dotnet test (LiveSplit fixtures)'
+    dotnet test tests/LiveSplit.CustomComparisons.Tests --nologo -v minimal -p:BuildEditor=false
+    Write-Output "=== livesplit test exit code: $LASTEXITCODE"
     Write-Output '=== dotnet build (component)'
     dotnet build src/LiveSplit.CustomComparisons -c Release --nologo -v minimal
     Write-Output "=== build exit code: $LASTEXITCODE"
