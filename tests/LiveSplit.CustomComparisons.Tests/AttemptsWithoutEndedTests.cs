@@ -1,4 +1,5 @@
 using System.Linq;
+using LiveSplit.CustomComparisons;
 using LiveSplit.Model;
 using Xunit;
 
@@ -40,10 +41,18 @@ namespace LiveSplit.CustomComparisons.Tests
                 // Minimum of attempt 1 (40+60) and attempt 2 (30+40). Attempt 3's 1+1 is absent.
                 Assert.Equal(new double?[] { 30, 70 }, LiveSplitHarness.Splits(run, "Recent Min", TimingMethod.RealTime));
 
-                // Nothing on the comparison says an attempt was left out.
-                Assert.Null(session.Component.StatusOf(session.Component.Library.Entries.Single(e => e.Name == "Best Recent")));
-                Assert.Null(session.Component.StatusOf(session.Component.Library.Entries.Single(e => e.Name == "Recent Min")));
+                // Nothing on the comparison says an attempt was left out. Working means
+                // no error and no empty-segment warning for the current timing method.
+                AssertQuiet(session, "Best Recent");
+                AssertQuiet(session, "Recent Min");
             }
+        }
+
+        private static void AssertQuiet(Session session, string name)
+        {
+            ComparisonStatus status = session.Component.StatusOf(session.Component.Library.Entries.Single(e => e.Name == name));
+            Assert.False(status.IsProblem);
+            Assert.False(status.IsWarning);
         }
     }
 }
