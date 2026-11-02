@@ -518,13 +518,39 @@ function renderPreview(result: PreviewResultMessage): void {
     setStatus("info", "Add a comparison to get started.");
   } else if (result.rows.length === 0) {
     setStatus("info", "Open a splits file in LiveSplit to see a preview.");
-  } else if (result.rows.some(isBelowGold)) {
-    setStatus("warn", belowGoldMessage(result.rows));
-  } else if (result.rows.some((r) => r.segmentMs === null)) {
-    setStatus("warn", "Some segments are empty, so the splits after them are too. Wrap your blocks in \"use … if empty, use\" to fill the gaps.");
   } else {
-    setStatus("ok", "No problems");
+    const empty = emptySegmentStatus(result);
+    const gold = result.rows.some(isBelowGold) ? belowGoldMessage(result.rows) : null;
+    if (empty && gold) setStatus("warn", `${empty} ${gold}`);
+    else if (empty) setStatus("warn", empty);
+    else if (gold) setStatus("warn", gold);
+    else setStatus("ok", "No problems");
   }
+}
+
+/**
+ * The settings-list sentence for this preview. LiveSplit sends the engine's
+ * own wording (`EmptySegmentStatus.Describe`); the browser stand-in doesn't,
+ * so derive the same sentence from the rows. A segment counts as empty when
+ * its own time is missing, not merely because an earlier gap blanked its split.
+ */
+function emptySegmentStatus(result: PreviewResultMessage): string | null {
+  if (result.emptyStatus !== undefined) return result.emptyStatus;
+  const rows = result.rows;
+  const total = rows.length;
+  if (total === 0) return null;
+  let empty = 0;
+  let first = "";
+  rows.forEach((row, i) => {
+    if (row.segmentMs !== null) return;
+    empty += 1;
+    if (empty === 1) {
+      first = row.segment.trim() ? row.segment : `segment ${i + 1}`;
+    }
+  });
+  if (empty === 0) return null;
+  if (empty === total) return "No times at all";
+  return `Working — no times for ${empty} of ${total} segments (first: ${first})`;
 }
 
 /** Says which segments beat their gold and, when it can tell, why. */

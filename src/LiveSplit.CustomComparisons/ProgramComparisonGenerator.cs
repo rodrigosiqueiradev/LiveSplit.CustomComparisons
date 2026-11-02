@@ -29,8 +29,21 @@ internal sealed class ProgramComparisonGenerator : IComparisonGenerator
 
     public string Name { get; }
 
-    /// <summary>Why the last generation produced nothing, or null if it worked. Shown in settings.</summary>
+    /// <summary>Why the last generation failed, or null when neither timing method reported an error. Shown ahead of any empty-segment warning.</summary>
     public string LastError { get; private set; }
+
+    /// <summary>
+    /// Empty-segment warning after the last successful real-time generation.
+    /// Null when real time failed, or when every real-time segment has a time.
+    /// </summary>
+    public string RealTimeEmptyWarning { get; private set; }
+
+    /// <summary>Same as <see cref="RealTimeEmptyWarning"/>, for game time.</summary>
+    public string GameTimeEmptyWarning { get; private set; }
+
+    /// <summary>The empty-segment warning for the timing method the runner is looking at.</summary>
+    public string EmptyWarningFor(TimingMethod method) =>
+        method == TimingMethod.GameTime ? GameTimeEmptyWarning : RealTimeEmptyWarning;
 
     public void Generate(ISettings settings)
     {
@@ -43,19 +56,24 @@ internal sealed class ProgramComparisonGenerator : IComparisonGenerator
         {
             // One source for both timing methods, so a switched-off built-in is computed once.
             var comparisons = new ComparisonSource(Run, settings, ownComparisonNames);
-            string realTimeError = Generate(TimingMethod.RealTime, comparisons);
-            string gameTimeError = Generate(TimingMethod.GameTime, comparisons);
+            string realTimeError = Generate(TimingMethod.RealTime, comparisons, out string realGap);
+            string gameTimeError = Generate(TimingMethod.GameTime, comparisons, out string gameGap);
             LastError = realTimeError ?? gameTimeError;
+            // A failure already explains a blank column. Only keep the warning when that method succeeded.
+            RealTimeEmptyWarning = realTimeError == null ? realGap : null;
+            GameTimeEmptyWarning = gameTimeError == null ? gameGap : null;
         }
         catch (Exception e)
         {
             // Never let a bad program take LiveSplit down mid-session.
             LastError = "Unexpected error: " + e.Message;
+            RealTimeEmptyWarning = null;
+            GameTimeEmptyWarning = null;
             Clear();
         }
     }
 
-    private string Generate(TimingMethod method, ComparisonSource comparisons)
+    private string Generate(TimingMethod method, ComparisonSource comparisons, out string emptyWarning)
     {
         ComparisonResult result = evaluator.Evaluate(Name, RunAdapter.ToRunData(Run, method, comparisons));
 
@@ -67,7 +85,19 @@ internal sealed class ProgramComparisonGenerator : IComparisonGenerator
             Run[i].Comparisons[Name] = time;
         }
 
+        emptyWarning = result.Error == null ? EmptySegmentStatus.Describe(SegmentNames(), result.SegmentTimes) : null;
         return result.Error;
+    }
+
+    private string[] SegmentNames()
+    {
+        var names = new string[Run.Count];
+        for (int i = 0; i < Run.Count; i++)
+        {
+            names[i] = Run[i].Name;
+        }
+
+        return names;
     }
 
     private void Clear()
