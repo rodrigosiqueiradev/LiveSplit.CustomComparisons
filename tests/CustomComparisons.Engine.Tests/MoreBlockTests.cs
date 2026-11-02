@@ -124,6 +124,17 @@ public class MoreBlockTests
     }
 
     [Fact]
+    public void Attempt_keeps_later_segments_when_one_timing_method_is_missing()
+    {
+        RunData run = new RunBuilder("Cave", "Temple", "Finish")
+            .Attempt(null, 8, 12)
+            .NoTime(0)
+            .Build();
+
+        Assert.Equal(new double?[] { null, 8, 12 }, Seconds(Run(new AttemptNode(1), run).SegmentTimes));
+    }
+
+    [Fact]
     public void An_attempt_that_doesnt_exist_is_reported()
     {
         RunData run = new RunBuilder("A").Attempt(10).Build();

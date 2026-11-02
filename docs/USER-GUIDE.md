@@ -202,9 +202,9 @@ The two coloured shapes above the canvas are a reminder of which is which.
 
 | Block | What it does |
 |---|---|
-| **all my times for each segment** ⬡ | Every time you've recorded for each segment. Skipped segments (and the combined segment right after a skip) are left out. |
+| **all my times for each segment** ⬡ | Every time you've recorded for each segment. Skipped segments (and the combined segment right after a skip) are left out. A split you took that has no time in the current timing method — game time was off for one split, for example — is left out of that method only, and the next split still counts. |
 | **comparison** ⬭ | An existing comparison, like *Personal Best*, *Best Segments* or one of your own custom comparisons. LiveSplit's built-in ones work even if you've switched them off. |
-| **attempt #** ⬭ | One specific past attempt, by its number in LiveSplit's attempt history. Empty where that run skipped a split or reset. |
+| **attempt #** ⬭ | One specific past attempt, by its number in LiveSplit's attempt history. Empty where that run skipped a split, has no time for this timing method, or reset. |
 | **my best run from the last N days** ⬭ | Your fastest finished run from that period: a "recent PB" that moves as you play. Empty if no run finished in that time. |
 
 ### Filters: choose which runs count (list in, list out)

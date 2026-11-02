@@ -32,28 +32,27 @@ namespace LiveSplit.CustomComparisons.Tests
         }
 
         [Fact]
-        public void Missing_game_time_is_treated_as_a_skipped_split()
+        public void Missing_game_time_is_not_a_skipped_split()
         {
             using (Session session = LiveSplitHarness.Open("partial-game-time.lss", Program))
             {
                 var source = new ComparisonSource(session.Run, session.State.Settings, new HashSet<string>());
                 RunData game = RunAdapter.ToRunData(session.Run, TimingMethod.GameTime, source);
 
-                // The history entry is there. Game time on Cave is missing, not a deleted key.
+                // The history entry is there. Game time on Cave is missing, not a deleted key
+                // and not a skipped split.
                 Assert.True(game.Segments[0].History.ContainsKey(1));
                 Assert.Null(game.Segments[0].History[1]);
+                Assert.True(game.Segments[0].IsMissingTime(1));
+                Assert.False(game.Segments[1].IsMissingTime(1));
                 Assert.Equal(TimeSpan.FromSeconds(8), game.Segments[1].History[1]);
                 Assert.Equal(TimeSpan.FromSeconds(12), game.Segments[2].History[1]);
 
-                // Audit §4.1, confirmed: that null is treated as a skipped split, so Temple's 8s
-                // is thrown away and the minimum falls back to the other attempt's 100s.
-                // A runner should see 100, 108, 120 (Cave 100, Temple 8, Finish 12).
-                // The comparison column shows 100, 200, 212 instead. Reported separately.
-                Assert.Equal(new double?[] { 100, 200, 212 }, LiveSplitHarness.Splits(session.Run, Name, TimingMethod.GameTime));
+                // Cave falls back to the other attempt's 100s. Temple keeps 8s, Finish keeps 12s.
+                Assert.Equal(new double?[] { 100, 108, 120 }, LiveSplitHarness.Splits(session.Run, Name, TimingMethod.GameTime));
 
                 string reply = LiveSplitHarness.Preview(session.Component, session.State, Program, TimingMethod.GameTime);
-                // Segment times the editor shows: Temple is 100s, not 8s.
-                Assert.Equal(new double?[] { 100_000, 100_000, 12_000 }, LiveSplitHarness.PreviewSegmentMilliseconds(reply));
+                Assert.Equal(new double?[] { 100_000, 8_000, 12_000 }, LiveSplitHarness.PreviewSegmentMilliseconds(reply));
             }
         }
     }

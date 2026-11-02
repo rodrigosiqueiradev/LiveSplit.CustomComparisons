@@ -575,6 +575,8 @@ public sealed class ComparisonEvaluator
         /// rules: within an attempt, a skipped segment (null) means the next recorded
         /// segment time covers two segments, so it is left out too; and an attempt
         /// stops contributing at the first segment it never reached.
+        /// A null that is only a missing timing method is not a skip. It adds no sample
+        /// and leaves the following segment alone.
         /// </summary>
         private List<Sample>[] SegmentHistory()
         {
@@ -601,7 +603,10 @@ public sealed class ComparisonEvaluator
 
                     if (time == null)
                     {
-                        previousWasSkipped = true;
+                        if (!run.Segments[i].IsMissingTime(attempt))
+                        {
+                            previousWasSkipped = true;
+                        }
                     }
                     else if (previousWasSkipped)
                     {
