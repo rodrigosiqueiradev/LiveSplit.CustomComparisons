@@ -206,6 +206,20 @@ function compileSamples(block: Blockly.Block | null, parent: Blockly.Block): Ast
   }
 }
 
+/** Compiles one block and everything plugged into it. Hexagon blocks are samples; round blocks are times. */
+function compileBlock(block: Blockly.Block): { of: "times" | "samples"; node: AstNode } {
+  const check = block.outputConnection?.getCheck() ?? [];
+  if (check.includes("Samples")) {
+    return { of: "samples", node: compileSamples(block, block) };
+  }
+
+  if (check.includes("Times")) {
+    return { of: "times", node: compileTimes(block, block, "This block isn't finished.") };
+  }
+
+  throw new CompileError("Click a block to preview it.", block.id);
+}
+
 // ---------------------------------------------------------------- AST -> blocks
 
 type BlockState = {

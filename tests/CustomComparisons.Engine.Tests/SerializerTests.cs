@@ -18,6 +18,36 @@ public class SerializerTests
         Assert.Throws<ProgramFormatException>(() => ProgramSerializer.Read(text)).Message;
 
     [Fact]
+    public void A_list_of_times_still_cannot_be_a_saved_comparison()
+    {
+        Assert.Contains("list of times", ErrorFor(Wrap("{\"type\":\"segmentHistory\"}")));
+    }
+
+    [Fact]
+    public void ReadSamplesRoot_reads_a_filter_and_rejects_a_round_block()
+    {
+        SamplesNode node = ProgramSerializer.ReadSamplesRoot(
+            Wrap("{\"type\":\"lastN\",\"count\":2,\"source\":{\"type\":\"segmentHistory\"}}"));
+        LastNNode last = Assert.IsType<LastNNode>(node);
+        Assert.Equal(2, last.Count);
+        Assert.IsType<SegmentHistoryNode>(last.Source);
+
+        string round = Wrap("{\"type\":\"comparison\",\"name\":\"Personal Best\"}");
+        Assert.Contains(
+            "one time per segment",
+            Assert.Throws<ProgramFormatException>(() => ProgramSerializer.ReadSamplesRoot(round)).Message);
+    }
+
+    [Fact]
+    public void ReadSamplesRoot_uses_the_same_field_checks_as_a_saved_block()
+    {
+        string text = Wrap("{\"type\":\"lastN\",\"count\":0,\"source\":{\"type\":\"segmentHistory\"}}");
+        Assert.Contains(
+            "whole number from 1",
+            Assert.Throws<ProgramFormatException>(() => ProgramSerializer.ReadSamplesRoot(text)).Message);
+    }
+
+    [Fact]
     public void Every_block_survives_a_round_trip()
     {
         // One program that uses every block type.

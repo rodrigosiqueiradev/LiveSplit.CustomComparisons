@@ -224,6 +224,7 @@ public sealed class AttemptNode : TimesNode
 /// Keeps only times from attempts that got at least as far as segment <see cref="Segment"/>
 /// (1-based): they have a recorded or skipped time for it. Good for reset-heavy games, where
 /// few runs finish. A segment past the end of the run keeps nothing.
+/// <see cref="CustomComparisons.Engine.Evaluation.SegmentReferenceStatus"/> warns about that; it is not an error.
 /// </summary>
 public sealed class ReachedSegmentNode : SamplesNode
 {
@@ -496,8 +497,9 @@ public sealed class SegmentRangeCase
 
 /// <summary>
 /// "Use A for segments 1-4, B for the rest". The first case containing a segment wins;
-/// segments no case covers use <see cref="Otherwise"/>. Ranges past the end of the run
-/// simply never match.
+/// segments no case covers use <see cref="Otherwise"/>. A range that starts past the end
+/// of the run never matches. <see cref="CustomComparisons.Engine.Evaluation.SegmentReferenceStatus"/> warns when a
+/// range names a segment the run doesn't have; that is not an error.
 /// </summary>
 public sealed class SegmentRangeSwitchNode : TimesNode
 {

@@ -197,8 +197,24 @@ public static class ProgramSerializer
 
     // ------------------------------------------------------------------ Reading
 
-    /// <summary>Parses a program file. Throws <see cref="ProgramFormatException"/> with a readable message.</summary>
-    public static ProgramDocument Read(string text)
+    private readonly struct DocumentHeader
+    {
+        public DocumentHeader(JsonObject root, int version, string name)
+        {
+            Root = root;
+            Version = version;
+            Name = name;
+        }
+
+        public JsonObject Root { get; }
+
+        public int Version { get; }
+
+        public string Name { get; }
+    }
+
+    /// <summary>The file envelope shared by a saved comparison and a block preview.</summary>
+    private static DocumentHeader ReadHeader(string text)
     {
         JsonValue json;
         try
@@ -237,9 +253,27 @@ public static class ProgramSerializer
             throw new ProgramFormatException($"The comparison name is longer than {ComparisonNames.MaxLength} characters.");
         }
 
-        TimesNode program = ReadTimes(Required(root, "root", ""), "root");
-        JsonValue workspace = root["workspace"];
-        return new ProgramDocument(new ComparisonProgram(name, program, version), workspace is JsonNull ? null : workspace);
+        return new DocumentHeader(root, version, name.Trim());
+    }
+
+    /// <summary>Parses a program file. Throws <see cref="ProgramFormatException"/> with a readable message.</summary>
+    public static ProgramDocument Read(string text)
+    {
+        DocumentHeader header = ReadHeader(text);
+        TimesNode program = ReadTimes(Required(header.Root, "root", ""), "root");
+        JsonValue workspace = header.Root["workspace"];
+        return new ProgramDocument(new ComparisonProgram(header.Name, program, header.Version), workspace is JsonNull ? null : workspace);
+    }
+
+    /// <summary>
+    /// Reads one hexagon block sent for preview. The envelope matches a comparison file,
+    /// but <c>root</c> is a list of times (segment history or a filter) rather than one
+    /// time per segment. A saved comparison still cannot have that root; use <see cref="Read"/>.
+    /// </summary>
+    public static SamplesNode ReadSamplesRoot(string text)
+    {
+        DocumentHeader header = ReadHeader(text);
+        return ReadSamples(Required(header.Root, "root", ""), "root");
     }
 
     private static TimesNode ReadTimes(JsonValue value, string path)

@@ -153,3 +153,67 @@ function describeOrigin(root: AstNode, path: string): string {
   const sentence = text.charAt(0).toUpperCase() + text.slice(1);
   return notes.length ? `${sentence} (${notes.join(", ")})` : sentence;
 }
+
+/**
+ * Same sentence as SegmentReferenceStatus in the engine. A range that still
+ * overlaps the splits reports only the end it names. A range that starts past
+ * the end reports the whole range. Adjacent numbers are joined.
+ */
+function segmentReferenceWarning(root: unknown, segmentCount: number): string | null {
+  if (segmentCount < 0 || root == null) return null;
+  const spans: SegmentSpan[] = [];
+  collectSegmentSpans(root, segmentCount, spans);
+  return formatSegmentSpans(spans, segmentCount);
+}
+
+/** Inclusive segment numbers a block names that the splits don't have. */
+type SegmentSpan = { from: number; to: number };
+
+function collectSegmentSpans(node: unknown, segmentCount: number, spans: SegmentSpan[]): void {
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectSegmentSpans(item, segmentCount, spans));
+    return;
+  }
+
+  if (!node || typeof node !== "object") return;
+  const obj = node as AstNode;
+  if (obj.type === "segmentRange" && Array.isArray(obj.cases)) {
+    for (const c of obj.cases as { from?: unknown; to?: unknown }[]) {
+      const span = spanForRange(Number(c.from), Number(c.to), segmentCount);
+      if (span) spans.push(span);
+    }
+  } else if (obj.type === "reachedSegment") {
+    const span = spanForReached(Number(obj.segment), segmentCount);
+    if (span) spans.push(span);
+  }
+
+  Object.values(obj).forEach((value) => collectSegmentSpans(value, segmentCount, spans));
+}
+
+function spanForReached(segment: number, segmentCount: number): SegmentSpan | null {
+  return Number.isInteger(segment) && segment > segmentCount ? { from: segment, to: segment } : null;
+}
+
+function spanForRange(from: number, to: number, segmentCount: number): SegmentSpan | null {
+  if (!Number.isInteger(from) || !Number.isInteger(to) || to < from || to <= segmentCount) return null;
+  return { from: from > segmentCount ? from : to, to };
+}
+
+/** The settings-list sentence for these out-of-range spans, or null when there are none. */
+function formatSegmentSpans(spans: SegmentSpan[], segmentCount: number): string | null {
+  if (spans.length === 0) return null;
+  const sorted = [...spans].sort((a, b) => a.from - b.from || a.to - b.to);
+  const merged: SegmentSpan[] = [];
+  for (const span of sorted) {
+    const last = merged[merged.length - 1];
+    if (!last || span.from > last.to + 1) merged.push({ ...span });
+    else last.to = Math.max(last.to, span.to);
+  }
+
+  const parts = merged.map((span) => (span.from === span.to ? String(span.from) : `${span.from} to ${span.to}`));
+  const list = parts.length === 1 ? parts[0] : parts.length === 2
+    ? `${parts[0]} and ${parts[1]}`
+    : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  const noun = merged.length === 1 && merged[0].from === merged[0].to ? "segment" : "segments";
+  return `Uses ${noun} ${list}, but your splits have ${segmentCount}`;
+}

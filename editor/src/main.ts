@@ -25,6 +25,12 @@ const ui = {
   banner: document.getElementById("banner") as HTMLDivElement,
   blockly: document.getElementById("blockly") as HTMLDivElement,
   empty: document.getElementById("empty") as HTMLDivElement,
+  preview: document.getElementById("preview") as HTMLElement,
+  previewTitle: document.getElementById("preview-title") as HTMLSpanElement,
+  previewColumns: document.getElementById("preview-columns") as HTMLDivElement,
+  blockBanner: document.getElementById("block-banner") as HTMLDivElement,
+  blockBannerDetail: document.getElementById("block-banner-detail") as HTMLParagraphElement,
+  blockBannerBack: document.getElementById("block-banner-back") as HTMLButtonElement,
   previewRows: document.getElementById("preview-rows") as HTMLDivElement,
   previewStatus: document.getElementById("preview-status") as HTMLDivElement,
   timingButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-timing]")),
@@ -51,6 +57,12 @@ let previewTimer = 0;
 let previewRequestId = 0;
 /** The program last sent for preview, to explain warnings about it. */
 let previewedRoot: AstNode | null = null;
+/** The block being previewed, or null for the whole comparison. */
+let previewOfBlockId: string | null = null;
+/** Plain-English description of that block, shown under the banner. */
+let blockPreviewDetail = "";
+/** What the in-flight preview asked for, in case a reply omits `of`. */
+let lastPreviewOf: PreviewOf = "comparison";
 /** What preview differences are measured against. */
 let compareTo = "Personal Best";
 /** The PB's final time and the sum of best, once a preview has shown them; used for "Goal pace". */
@@ -58,6 +70,8 @@ let pbTotalMs: number | null = null;
 let sumOfBestMs: number | null = null;
 /** Which preview rows are expanded to show where their time came from. */
 const expandedRows = new Set<number>();
+/** First block whose range or reached segment is past the end of the splits. */
+let outOfRangeBlockId: string | null = null;
 
 // ---------------------------------------------------------------- Startup
 
@@ -91,6 +105,8 @@ function start(): void {
     move: { scrollbars: true, drag: true, wheel: false },
   });
   workspace.addChangeListener(onWorkspaceChange);
+  workspace.addChangeListener(onEditorClick);
+  ui.blockBannerBack.addEventListener("click", () => focusBlock(null));
 
   // Keep the block selector open while working with blocks (like Scratch), starting on
   // the first category. Clicking the selected category again still closes it.
@@ -208,6 +224,7 @@ function selectTab(index: number): void {
   refreshEditorChoices();
   refreshCompareOptions();
   expandedRows.clear();
+  previewOfBlockId = null;
   showNameError();
   renderTabs();
   schedulePreview(0);
@@ -396,25 +413,100 @@ function schedulePreview(delay: number): void {
   previewTimer = window.setTimeout(requestPreview, delay);
 }
 
+/** Click a block to preview its subtree. Click the canvas, or the "this comparison is" block, to go back. */
+function onEditorClick(event: Blockly.Events.Abstract): void {
+  if (loading || event.type !== Blockly.Events.CLICK || event.workspaceId !== workspace.id) {
+    return;
+  }
+
+  const click = event as Blockly.Events.Abstract & { targetType?: string; blockId?: string };
+  if (click.targetType === "zoom_controls") {
+    return;
+  }
+
+  if (click.targetType !== "block" || !click.blockId) {
+    focusBlock(null);
+    return;
+  }
+
+  const block = workspace.getBlockById(click.blockId);
+  if (!block || block.isInFlyout || block.isInsertionMarker()) {
+    return;
+  }
+
+  focusBlock(block.type === BLOCK.result ? null : block.id);
+}
+
+function focusBlock(blockId: string | null): void {
+  if (blockId === previewOfBlockId) {
+    return;
+  }
+
+  previewOfBlockId = blockId;
+  if (blockId === null && Blockly.common.getSelected()) {
+    // The typings omit null; passing it is how Blockly clears the selection.
+    (Blockly.common.setSelected as (selectable: object | null) => void)(null);
+  }
+
+  schedulePreview(0);
+}
+
 function requestPreview(): void {
   const requestId = ++previewRequestId;
+  outOfRangeBlockId = flagOutOfRangeSegments();
+  if (previewOfBlockId && !workspace.getBlockById(previewOfBlockId)) {
+    previewOfBlockId = null;
+  }
+
   if (active < 0) {
     ui.summary.textContent = "";
-    renderPreview({ type: "previewResult", requestId, rows: [], error: null });
+    showComparisonChrome();
+    renderPreview({ type: "previewResult", requestId, of: "comparison", rows: [], error: null });
     return;
   }
 
-  let root: AstNode;
+  const block = previewOfBlockId ? workspace.getBlockById(previewOfBlockId) : null;
+  let comparisonRoot: AstNode | null = null;
   try {
-    root = compileWorkspace(workspace);
+    comparisonRoot = compileWorkspace(workspace);
+    ui.summary.textContent = summarize(comparisonRoot);
+    ui.summary.classList.remove("unfinished");
   } catch (e) {
-    renderIncomplete(e as Error);
+    if (!block) {
+      showComparisonChrome();
+      renderIncomplete(e as Error);
+      return;
+    }
+
+    ui.summary.textContent = "Not finished yet.";
+    ui.summary.classList.add("unfinished");
+  }
+
+  if (block) {
+    let compiled: { of: "times" | "samples"; node: AstNode };
+    try {
+      compiled = compileBlock(block);
+    } catch (e) {
+      renderBlockProblem(e as Error);
+      return;
+    }
+
+    blockPreviewDetail = compiled.of === "samples" ? describeSamples(compiled.node) : describeTimes(compiled.node);
+    showBlockChrome(blockPreviewDetail);
+    sendPreview(requestId, compiled.of, compiled.node, comparisonRoot);
     return;
   }
 
-  ui.summary.textContent = summarize(root);
-  ui.summary.classList.remove("unfinished");
+  if (!comparisonRoot) {
+    return;
+  }
 
+  blockPreviewDetail = "";
+  showComparisonChrome();
+  sendPreview(requestId, "comparison", comparisonRoot, null);
+}
+
+function sendPreview(requestId: number, of: PreviewOf, root: AstNode, fullComparison: AstNode | null): void {
   storeActiveTab();
   const others: ProgramDoc[] = [];
   tabs.forEach((tab, i) => {
@@ -423,15 +515,58 @@ function requestPreview(): void {
     if (otherRoot) others.push(makeDoc(tab.name, otherRoot, tab.state));
   });
 
+  // So a comparison block inside the previewed block still means the whole comparison.
+  if (of !== "comparison" && fullComparison && active >= 0 && !nameProblem(tabs[active].name, active)) {
+    others.push(makeDoc(tabs[active].name, fullComparison, tabs[active].state));
+  }
+
+  lastPreviewOf = of;
   previewedRoot = root;
   host.send({
     type: "preview",
     requestId,
     timingMethod,
     compareTo,
-    program: makeDoc(tabs[active].name.trim() || "Preview", root, tabs[active].state),
+    of,
+    program: makeDoc(of === "comparison" ? tabs[active].name.trim() || "Preview" : "Block preview", root, tabs[active].state),
     others,
   });
+}
+
+function asSentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return capitalized.endsWith(".") ? capitalized : capitalized + ".";
+}
+
+/** Banner and title for a block preview. Column headers wait until the rows arrive. */
+function showBlockChrome(detail: string): void {
+  ui.preview.classList.add("block-mode");
+  ui.previewTitle.textContent = "Block preview";
+  ui.blockBanner.hidden = false;
+  ui.blockBannerDetail.textContent = asSentence(detail);
+}
+
+function showComparisonChrome(): void {
+  ui.preview.classList.remove("block-mode", "samples-mode");
+  ui.previewTitle.textContent = "Preview";
+  ui.blockBanner.hidden = true;
+  ui.blockBannerDetail.textContent = "";
+  setColumns(false);
+}
+
+function setColumns(samples: boolean): void {
+  const labels: [string, string][] = samples
+    ? [["Segment", ""], ["Count", "How many times this block kept"], ["Fastest", ""], ["Median", ""], ["Slowest", ""]]
+    : [["Segment", ""], ["Segment time", ""], ["Split time", ""]];
+  ui.previewColumns.replaceChildren(
+    ...labels.map(([text, tip], i) => {
+      const span = cell(text, i === 0 ? "name" : "time");
+      if (tip) span.title = tip;
+      return span;
+    }),
+  );
 }
 
 function setTimingMethod(method: TimingMethod, refresh = true): void {
@@ -451,6 +586,20 @@ function isBelowGold(row: PreviewRow): boolean {
 }
 
 function renderPreview(result: PreviewResultMessage): void {
+  const of = result.of ?? lastPreviewOf;
+  if (of === "samples") {
+    renderSamplePreview(result);
+    return;
+  }
+
+  if (of === "times") {
+    showBlockChrome(blockPreviewDetail);
+    ui.preview.classList.remove("samples-mode");
+  } else {
+    showComparisonChrome();
+  }
+
+  setColumns(false);
   const reference = describeTimes({ type: "comparison", name: result.compareTo ?? compareTo });
   if ((result.compareTo ?? compareTo) === "Personal Best" && result.rows.length > 0) {
     pbTotalMs = result.rows[result.rows.length - 1].referenceMs;
@@ -519,12 +668,12 @@ function renderPreview(result: PreviewResultMessage): void {
   } else if (result.rows.length === 0) {
     setStatus("info", "Open a splits file in LiveSplit to see a preview.");
   } else {
+    const mismatch = segmentWarningFor(result);
     const empty = emptySegmentStatus(result);
     const gold = result.rows.some(isBelowGold) ? belowGoldMessage(result.rows) : null;
-    if (empty && gold) setStatus("warn", `${empty} ${gold}`);
-    else if (empty) setStatus("warn", empty);
-    else if (gold) setStatus("warn", gold);
-    else setStatus("ok", "No problems");
+    const parts = [mismatch, empty, gold].filter((part): part is string => !!part);
+    if (parts.length === 0) setStatus("ok", "No problems");
+    else setStatus("warn", parts.join(" "), mismatch ? showOutOfRangeBlock : undefined);
   }
 }
 
@@ -580,6 +729,121 @@ function belowGoldMessage(rows: PreviewRow[]): string {
   return message.trim();
 }
 
+/** Hexagon block: count and fastest / middle / slowest, with no comparison deltas. */
+function renderSamplePreview(result: PreviewResultMessage): void {
+  showBlockChrome(blockPreviewDetail);
+  ui.preview.classList.add("samples-mode");
+  setColumns(true);
+  const samples = result.samples ?? [];
+  ui.previewRows.replaceChildren(
+    ...samples.map((row) => {
+      const line = document.createElement("div");
+      line.className = "row" + (row.count === 0 ? " empty" : "");
+      line.append(
+        cell(row.segment, "name"),
+        cell(String(row.count), "time"),
+        cell(formatTime(row.minMs), "time"),
+        cell(formatTime(row.medianMs), "time"),
+        cell(formatTime(row.maxMs), "time"),
+      );
+      return line;
+    }),
+  );
+  ui.totals.hidden = true;
+
+  if (result.error) {
+    setStatus("error", result.error);
+    return;
+  }
+
+  if (samples.length === 0) {
+    setStatus("info", "Open a splits file in LiveSplit to see a preview.");
+    return;
+  }
+
+  const mismatch = segmentWarningFor(result);
+  const missing = samples.map((row, i) => ({ row, i })).filter((x) => x.row.count === 0);
+  let detail: string | null = null;
+  if (missing.length === samples.length) {
+    detail = "This block keeps no times.";
+  } else if (missing.length > 0) {
+    const first = missing[0];
+    const name = first.row.segment.trim() ? first.row.segment : `segment ${first.i + 1}`;
+    detail = `No times for ${missing.length} of ${samples.length} segments (first: ${name}).`;
+  }
+
+  const parts = [mismatch, detail].filter((part): part is string => !!part);
+  if (parts.length === 0) setStatus("ok", "Keeps times for every segment.");
+  else setStatus("warn", parts.join(" "), mismatch ? showOutOfRangeBlock : undefined);
+}
+
+/**
+ * The settings-list sentence for a range or reached segment past the end of the
+ * splits. LiveSplit sends the engine's wording (`SegmentReferenceStatus.Describe`);
+ * the browser stand-in doesn't, so derive the same sentence from the program.
+ */
+function segmentWarningFor(result: PreviewResultMessage): string | null {
+  if (result.segmentWarning !== undefined) return result.segmentWarning;
+  if (segmentNames.length < 1) return null;
+  return segmentReferenceWarning(previewedRoot, segmentNames.length);
+}
+
+/** Marks every range and reached-segment block that names a segment the splits don't have. */
+function flagOutOfRangeSegments(): string | null {
+  const count = segmentNames.length;
+  let first: string | null = null;
+  Blockly.Events.disable();
+  try {
+    for (const block of workspace.getAllBlocks(false)) {
+      if (block.isInFlyout || block.isInsertionMarker()) continue;
+      const warning = blockSegmentWarning(block, count);
+      block.setWarningText(warning, "segment-bounds");
+      if (warning && !first) first = block.id;
+    }
+  } finally {
+    Blockly.Events.enable();
+  }
+
+  return first;
+}
+
+function blockSegmentWarning(block: Blockly.Block, segmentCount: number): string | null {
+  if (segmentCount < 1) return null;
+  if (block.type === BLOCK.range) {
+    const from = Number(block.getFieldValue("FROM"));
+    const to = Number(block.getFieldValue("TO"));
+    return formatSegmentSpans(spanList(spanForRange(from, to, segmentCount)), segmentCount);
+  }
+
+  if (block.type === BLOCK.reached) {
+    return formatSegmentSpans(spanList(spanForReached(Number(block.getFieldValue("SEGMENT")), segmentCount)), segmentCount);
+  }
+
+  return null;
+}
+
+function spanList(span: { from: number; to: number } | null): { from: number; to: number }[] {
+  return span ? [span] : [];
+}
+
+function showOutOfRangeBlock(): void {
+  const id = flaggedBlockForCurrentPreview() ?? outOfRangeBlockId;
+  if (id) showBlock(id);
+}
+
+/** The flagged block in what's being previewed, so "Show me" doesn't jump to a different one. */
+function flaggedBlockForCurrentPreview(): string | null {
+  const count = segmentNames.length;
+  const root = previewOfBlockId ? workspace.getBlockById(previewOfBlockId) : null;
+  // getDescendants includes the block itself.
+  const blocks = root ? root.getDescendants(false) : workspace.getAllBlocks(false);
+  for (const block of blocks) {
+    if (!block.isInFlyout && !block.isInsertionMarker() && blockSegmentWarning(block, count)) return block.id;
+  }
+
+  return null;
+}
+
 /** Every block of the given type in a program. */
 function findNodes(node: unknown, type: string): AstNode[] {
   const found: AstNode[] = [];
@@ -607,7 +871,7 @@ function renderTotals(result: PreviewResultMessage, reference: string): void {
   const sumOfBest = result.rows.every((r) => r.bestSegmentMs !== null)
     ? result.rows.reduce((total, r) => total + (r.bestSegmentMs as number), 0)
     : null;
-  const parts: [string, string, string][] = [["This comparison", formatTime(last.splitMs), ""]];
+  const parts: [string, string, string][] = [[(result.of ?? lastPreviewOf) === "times" ? "This block" : "This comparison", formatTime(last.splitMs), ""]];
   const delta = diff(last.splitMs, last.referenceMs);
   parts.push([reference.charAt(0).toUpperCase() + reference.slice(1), formatTime(last.referenceMs), delta === null ? "" : formatDelta(delta)]);
   parts.push(["Sum of best", formatTime(sumOfBest), ""]);
@@ -685,10 +949,21 @@ function goalDefault(): number {
 }
 
 function renderIncomplete(error: Error): void {
+  showComparisonChrome();
   ui.previewRows.replaceChildren();
   ui.totals.hidden = true;
   ui.summary.textContent = "Not finished yet.";
   ui.summary.classList.add("unfinished");
+  const blockId = error instanceof CompileError ? error.blockId : null;
+  setStatus("warn", error.message, blockId ? () => showBlock(blockId) : undefined);
+}
+
+function renderBlockProblem(error: Error): void {
+  showBlockChrome("This block isn't finished");
+  ui.preview.classList.remove("samples-mode");
+  setColumns(false);
+  ui.previewRows.replaceChildren();
+  ui.totals.hidden = true;
   const blockId = error instanceof CompileError ? error.blockId : null;
   setStatus("warn", error.message, blockId ? () => showBlock(blockId) : undefined);
 }
