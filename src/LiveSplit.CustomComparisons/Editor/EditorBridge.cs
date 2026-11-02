@@ -112,16 +112,28 @@ internal sealed class EditorBridge
 
     // ------------------------------------------------------------ preview
 
+    /// <summary>
+    /// Name used while previewing one round block, so that block does not shadow a real
+    /// comparison of the same name. The editor passes the full comparison in "others".
+    /// </summary>
+    private const string BlockPreviewName = "\u0001";
+
     private JsonObject Preview(JsonObject message)
     {
         double requestId = (message["requestId"] as JsonNumber)?.Value ?? 0;
         TimingMethod method = (message["timingMethod"] as JsonString)?.Value == "GameTime" ? TimingMethod.GameTime : TimingMethod.RealTime;
-        var reply = new JsonObject().Add("type", "previewResult").Add("requestId", requestId);
+        string of = PreviewOf(message);
+        var reply = new JsonObject().Add("type", "previewResult").Add("requestId", requestId).Add("of", of);
 
         IRun run = state.Run;
         if (run == null || run.Count == 0)
         {
             return reply.Add("rows", new JsonArray()).Add("error", JsonNull.Instance);
+        }
+
+        if (of == "samples")
+        {
+            return PreviewSamples(message, reply, run, method);
         }
 
         ProgramDocument program;
@@ -132,6 +144,15 @@ internal sealed class EditorBridge
         catch (ProgramFormatException e)
         {
             return reply.Add("rows", new JsonArray()).Add("error", e.Message);
+        }
+
+        // A round block is already a legal program root. Give it a private name so a
+        // comparison block inside it still resolves to the real comparison in "others".
+        if (of == "times")
+        {
+            program = new ProgramDocument(
+                new ComparisonProgram(BlockPreviewName, program.Program.Root, program.Program.AstVersion),
+                program.Workspace);
         }
 
         // The other open programs, which the previewed one may use by name. Broken ones are skipped.
@@ -199,7 +220,71 @@ internal sealed class EditorBridge
             : null;
         return reply.Add("rows", rows)
             .Add("error", result.Error == null ? JsonNull.Instance : new JsonString(result.Error))
-            .Add("emptyStatus", emptyStatus == null ? JsonNull.Instance : new JsonString(emptyStatus));
+            .Add("emptyStatus", emptyStatus == null ? JsonNull.Instance : new JsonString(emptyStatus))
+            .Add("segmentWarning", SegmentWarning(program.Program.Root, run.Count));
+    }
+
+    /// <summary>
+    /// "comparison" (default), "times" (one round block as the root) or "samples"
+    /// (one hexagon block). Anything else is the whole comparison.
+    /// </summary>
+    private static string PreviewOf(JsonObject message)
+    {
+        string of = (message["of"] as JsonString)?.Value;
+        return of == "times" || of == "samples" ? of : "comparison";
+    }
+
+    /// <summary>
+    /// A hexagon block, re-read by <see cref="ProgramSerializer.ReadSamplesRoot"/> so the page
+    /// cannot skip the same field checks a saved block goes through.
+    /// </summary>
+    private JsonObject PreviewSamples(JsonObject message, JsonObject reply, IRun run, TimingMethod method)
+    {
+        SamplesNode node;
+        try
+        {
+            node = ReadSamples(message["program"]);
+        }
+        catch (ProgramFormatException e)
+        {
+            return reply.Add("rows", new JsonArray()).Add("error", e.Message);
+        }
+
+        IReadOnlyList<SampleSegmentSummary> summaries;
+        try
+        {
+            var source = new ComparisonSource(run, state.Settings, new HashSet<string>(StringComparer.Ordinal));
+            var evaluator = new ComparisonEvaluator(Enumerable.Empty<ComparisonProgram>());
+            summaries = evaluator.SummarizeSamples(node, RunAdapter.ToRunData(run, method, source));
+        }
+        catch (Exception e)
+        {
+            return reply.Add("rows", new JsonArray()).Add("error", "Unexpected error: " + e.Message);
+        }
+
+        var samples = new JsonArray();
+        for (int i = 0; i < run.Count; i++)
+        {
+            SampleSegmentSummary summary = i < summaries.Count ? summaries[i] : null;
+            samples.Items.Add(new JsonObject()
+                .Add("segment", run[i].Name ?? "")
+                .Add("count", summary?.Count ?? 0)
+                .Add("minMs", Milliseconds(summary?.Min))
+                .Add("medianMs", Milliseconds(summary?.Median))
+                .Add("maxMs", Milliseconds(summary?.Max)));
+        }
+
+        return reply.Add("rows", new JsonArray())
+            .Add("samples", samples)
+            .Add("error", JsonNull.Instance)
+            .Add("segmentWarning", SegmentWarning(node, run.Count));
+    }
+
+    /// <summary>Same sentence as the settings list when a range or reached segment is past the end of the splits.</summary>
+    private static JsonValue SegmentWarning(Node root, int segmentCount)
+    {
+        string warning = SegmentReferenceStatus.Describe(root, segmentCount);
+        return warning == null ? JsonNull.Instance : new JsonString(warning);
     }
 
     // ------------------------------------------------------------ save
@@ -256,6 +341,16 @@ internal sealed class EditorBridge
         }
 
         return ProgramSerializer.Read(JsonWriter.Write(value, indented: false));
+    }
+
+    private static SamplesNode ReadSamples(JsonValue value)
+    {
+        if (value == null)
+        {
+            throw new ProgramFormatException("A program is missing.");
+        }
+
+        return ProgramSerializer.ReadSamplesRoot(JsonWriter.Write(value, indented: false));
     }
 
     private static JsonArray Strings(IEnumerable<string> values) =>

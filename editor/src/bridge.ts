@@ -51,32 +51,75 @@ function createSampleHost(): Host {
   ];
 
   // A tiny evaluator over the sample data, good enough to exercise the preview panel.
+  // The last segment is left empty so the preview has a gap to show.
+  const sampleLists = history.map((xs, i) => (i === segments.length - 1 ? [] : [...xs]));
+  const medianOf = (xs: number[]): number | null => {
+    if (xs.length === 0) return null;
+    const sorted = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const evalSamples = (node: AstNode): number[][] => {
+    switch (node.type) {
+      case "segmentHistory":
+        return sampleLists.map((xs) => [...xs]);
+      case "lastN": {
+        const n = Number(node.count);
+        return evalSamples(node.source as AstNode).map((xs) => xs.slice(Math.max(0, xs.length - n)));
+      }
+      case "atLeast": {
+        const n = Number(node.count);
+        return evalSamples(node.source as AstNode).map((xs) => (xs.length >= n ? xs : []));
+      }
+      case "trimOutliers": {
+        const percent = Number(node.percent);
+        return evalSamples(node.source as AstNode).map((xs) => {
+          const drop = Math.floor((xs.length * percent) / 100);
+          if (drop === 0) return xs;
+          const order = xs.map((t, i) => ({ t, i })).sort((a, b) => a.t - b.t || a.i - b.i);
+          const keep = new Set(order.slice(drop, xs.length - drop).map((x) => x.i));
+          return xs.filter((_, i) => keep.has(i));
+        });
+      }
+      case "reachedSegment":
+        return Number(node.segment) > segments.length
+          ? segments.map(() => [])
+          : evalSamples(node.source as AstNode);
+      case "completedRunsOnly":
+      case "recentDays":
+      case "finishedUnder":
+        return evalSamples(node.source as AstNode);
+      default:
+        return segments.map(() => []);
+    }
+  };
   const evalTimes = (node: AstNode): (number | null)[] => {
     switch (node.type) {
       case "comparison":
         return node.name === "Best Segments" ? [...best] : node.name === "Personal Best" ? [...pb] : segments.map(() => null);
       case "aggregate": {
-        const pick = (xs: number[]) => {
-          const s = [...xs].sort((a, b) => a - b);
+        return evalSamples(node.source as AstNode).map((xs) => {
+          if (xs.length === 0) return null;
+          const sorted = [...xs].sort((a, b) => a - b);
           switch (node.kind) {
-            case "min": return s[0];
-            case "max": return s[s.length - 1];
-            case "average": return s.reduce((a, b) => a + b, 0) / s.length;
-            default: return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+            case "min": return sorted[0];
+            case "max": return sorted[sorted.length - 1];
+            case "average": return sorted.reduce((a, b) => a + b, 0) / sorted.length;
+            default: return medianOf(xs);
           }
-        };
-        return history.map((xs, i) => (i === segments.length - 1 ? null : pick(xs)));
+        });
       }
       case "attempt":
         return pb.map((t) => t * 1.01);
       case "percentile": {
         const p = Number(node.percent) / 100;
-        return history.map((xs, i) => {
-          if (i === segments.length - 1) return null;
+        return evalSamples(node.source as AstNode).map((xs) => {
+          if (xs.length === 0) return null;
           const sorted = [...xs].sort((a, b) => a - b);
           const rank = p * (sorted.length - 1);
           const lo = Math.floor(rank);
-          return sorted[lo] + (sorted[Math.ceil(rank)] - sorted[lo]) * (rank - lo);
+          const hi = Math.ceil(rank);
+          return sorted[lo] + (sorted[hi] - sorted[lo]) * (rank - lo);
         });
       }
       case "stretchToTotal": {
@@ -99,8 +142,8 @@ function createSampleHost(): Host {
       case "bestRecentRun":
         return [...pb];
       case "weightedAverage":
-        return history.map((xs, i) => {
-          if (i === segments.length - 1) return null;
+        return evalSamples(node.source as AstNode).map((xs) => {
+          if (xs.length === 0) return null;
           let total = 0, weights = 0;
           [...xs].reverse().forEach((t, age) => {
             const w = Math.pow(0.5, age / Number(node.halfLife));
@@ -171,6 +214,29 @@ function createSampleHost(): Host {
           });
           break;
         case "preview": {
+          const of = message.of === "times" || message.of === "samples" ? message.of : "comparison";
+          if (of === "samples") {
+            const lists = evalSamples(message.program.root);
+            reply({
+              type: "previewResult",
+              requestId: message.requestId,
+              of: "samples",
+              error: null,
+              rows: [],
+              samples: segments.map((segment, i) => {
+                const xs = [...(lists[i] ?? [])].sort((a, b) => a - b);
+                return {
+                  segment,
+                  count: xs.length,
+                  minMs: xs.length ? xs[0] : null,
+                  medianMs: medianOf(xs),
+                  maxMs: xs.length ? xs[xs.length - 1] : null,
+                };
+              }),
+            });
+            break;
+          }
+
           const seg = evalTimes(message.program.root);
           const splits = cumulative(seg);
           const other = message.others.find((d) => d.name === message.compareTo);
@@ -185,6 +251,7 @@ function createSampleHost(): Host {
           reply({
             type: "previewResult",
             requestId: message.requestId,
+            of,
             error: null,
             compareTo: message.compareTo,
             rows: segments.map((segment, i) => ({

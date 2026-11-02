@@ -318,7 +318,7 @@ function defineBlocks(): void {
       inputsInline: false,
       output: "Times",
       colour: COLOURS.control,
-      tooltip: "Uses one rule for a range of segments and another for the rest. Put another of these in \"otherwise\" for more ranges.",
+      tooltip: "Uses one rule for a range of segments and another for the rest. Put another of these in \"otherwise\" for more ranges. If the range points past the end of your splits, you'll see a warning.",
     },
     {
       type: BLOCK.fallback,
@@ -452,7 +452,7 @@ function defineBlocks(): void {
       inputsInline: false,
       output: "Samples",
       colour: COLOURS.filter,
-      tooltip: "Keeps only times from attempts that got at least as far as this segment. Like \"completed runs only\", but for games where most runs reset early.",
+      tooltip: "Keeps only times from attempts that got at least as far as this segment. Like \"completed runs only\", but for games where most runs reset early. If this segment isn't in your splits, you'll see a warning and no times are kept.",
     },
     {
       type: BLOCK.weighted,

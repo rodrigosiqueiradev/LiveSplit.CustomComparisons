@@ -180,10 +180,12 @@ public sealed class CustomComparisonsComponent : LogicComponent
 
     /// <summary>
     /// What's shown in the settings list. An unreadable file, a name clash or an
-    /// evaluation failure is an error. Otherwise the warning describes the timing
-    /// method LiveSplit is currently set to, and says nothing about the other one:
-    /// most runs have no game time, and warning about that while the runner is on
-    /// real time would mark a healthy comparison as empty.
+    /// evaluation failure is an error. A range or reached segment past the end of
+    /// the current splits is a warning, ahead of an empty-segment warning: the
+    /// comparison still runs, but it may be showing the wrong arm. Otherwise the
+    /// warning describes the timing method LiveSplit is currently set to, and says
+    /// nothing about the other one: most runs have no game time, and warning about
+    /// that while the runner is on real time would mark a healthy comparison as empty.
     /// </summary>
     internal ComparisonStatus StatusOf(StoredComparison entry)
     {
@@ -198,14 +200,25 @@ public sealed class CustomComparisonsComponent : LogicComponent
         }
 
         ProgramComparisonGenerator generator = generators.FirstOrDefault(g => g.Name == entry.Name);
+        if (generator != null && generator.LastError != null)
+        {
+            return ComparisonStatus.Problem(generator.LastError);
+        }
+
+        // Structural: it doesn't depend on which timing method is showing.
+        int? segmentCount = state?.Run?.Count;
+        if (segmentCount != null && entry.Document != null)
+        {
+            string mismatch = SegmentReferenceStatus.Describe(entry.Document.Program.Root, segmentCount.Value);
+            if (mismatch != null)
+            {
+                return ComparisonStatus.Warning(mismatch);
+            }
+        }
+
         if (generator == null)
         {
             return ComparisonStatus.Working();
-        }
-
-        if (generator.LastError != null)
-        {
-            return ComparisonStatus.Problem(generator.LastError);
         }
 
         TimingMethod method = state?.CurrentTimingMethod ?? TimingMethod.RealTime;
@@ -351,7 +364,7 @@ public sealed class CustomComparisonsComponent : LogicComponent
     }
 }
 
-/// <summary>One row of the settings list: working, an empty-segment warning, or an error.</summary>
+/// <summary>One row of the settings list: working, a warning (stale segment or empty segments), or an error.</summary>
 internal readonly struct ComparisonStatus
 {
     private ComparisonStatus(string text, bool warning, bool problem)

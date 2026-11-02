@@ -152,6 +152,12 @@ select it and press **Delete**.
 - **Real time / Game time** switches which of your times the preview uses.
 - **Click a row** to see *why* it has that time: which block it came from and, for example,
   which comparison was used to fill a gap.
+- **Click a block** to preview just that block, instead of the whole comparison. A banner
+  at the top of the preview says **Previewing a block, not the comparison**, so the two
+  can't be mixed up. A round block shows the time each segment would get. A hexagon block
+  shows how many times it kept, plus the fastest, middle and slowest of them. That
+  answers "did my filter keep any runs?". Click **Show the whole comparison**, or an
+  empty part of the canvas, to go back.
 - A **yellow row** means that segment is faster than your best ever time for it (your
   gold). That's allowed, but it's a warning that the pace may not be realistic. A yellow
   note at the bottom lists them (see the right-hand picture below).
@@ -383,8 +389,13 @@ from your times in that method. If you never use game time, those times are simp
 beat your best ever time for that segment. That's allowed (maybe you want a stretch goal),
 it's just pointed out.
 
-**Changing splits.** *for segments X to Y* remembers segment **positions** (1st, 2nd, …),
-not names. If you add or remove segments, open the editor and check those ranges.
+**Changing splits.** *for segments X to Y* and *from runs that reached* remember segment
+**positions** (1st, 2nd, …), not names. If you add or remove segments and a range or a
+reached segment now points past the end of your splits, the editor marks that block and
+the settings list says so, for example "Uses segment 9, but your splits have 6". Nothing
+is moved for you: open the block and pick the segments again. Until you do, a range that
+starts past the end never matches (the *otherwise* rule is used instead) and a reached
+segment past the end keeps no times.
 
 ---
 
@@ -404,6 +415,12 @@ A segment has no time, so everything after it is blank too. Click a blank row in
 preview to see why, then add **use … if empty, use** with a backup like *Personal Best*.
 Also check that your splits file has enough runs for the rules you chose, and that you're
 looking at the timing method (Real / Game) you actually use.
+
+**The settings list says "Uses segment 9, but your splits have 6".**
+You added or removed splits after writing a *for segments X to Y* or *from runs that
+reached* block. Those remember positions, not names. The editor marks the block: open it
+and pick the segments again. Until you do, a range that starts past the end uses the
+*otherwise* rule, and a reached segment past the end keeps no times.
 
 **A block won't snap.**
 It's the wrong shape for that spot (see [How blocks fit together](#7-how-blocks-fit-together)).

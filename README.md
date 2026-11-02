@@ -21,7 +21,7 @@ own splits. Comparisons are saved in your layout and can be shared as `.json` fi
 - Double-click the component in the Layout Editor, then **Open block editor…** to build
   comparisons from blocks. Hexagon blocks give a list of times per segment and fit hexagon
   slots; round blocks give one time per segment and fit round slots. The preview updates
-  as you build.
+  as you build. Click a block to preview that block on its own.
 - From the same page you can **Import**, **Export**, **Rename** or **Delete** comparisons. Each one shows whether it's working, and why not if it isn't.
 - Comparisons are saved inside the layout (`.lsl`), so save the layout after changing them.
 

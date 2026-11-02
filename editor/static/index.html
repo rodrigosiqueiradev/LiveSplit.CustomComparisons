@@ -55,22 +55,27 @@
       </div>
     </section>
 
-    <aside class="preview" aria-label="Preview">
+    <aside class="preview" id="preview" aria-label="Preview">
       <div class="preview-head">
-        <span class="preview-title">Preview</span>
+        <span class="preview-title" id="preview-title">Preview</span>
         <span class="spacer"></span>
         <div class="toggle" role="group" aria-label="Timing method">
           <button type="button" data-timing="RealTime" aria-pressed="true">Real time</button>
           <button type="button" data-timing="GameTime" aria-pressed="false">Game time</button>
         </div>
       </div>
-      <div class="row head" aria-hidden="true">
+      <div id="block-banner" class="block-banner" role="status" hidden>
+        <p class="block-banner-title">Previewing a block, not the comparison</p>
+        <p id="block-banner-detail" class="block-banner-detail"></p>
+        <button id="block-banner-back" type="button" class="secondary small">Show the whole comparison</button>
+      </div>
+      <div id="preview-columns" class="row head" aria-hidden="true">
         <span class="name">Segment</span><span class="time">Segment time</span><span class="time">Split time</span>
       </div>
       <div class="preview-note">
         <label for="compare-to">Coloured numbers: difference from</label>
         <select id="compare-to"></select>
-        <span>for the time right above them. Click a segment to see where its time comes from.</span>
+        <span>for the time right above them. Click a segment to see where its time comes from. Click a block to preview that block instead of the whole comparison.</span>
       </div>
       <div id="preview-rows" class="rows"></div>
       <div id="totals" class="totals" hidden></div>

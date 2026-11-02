@@ -47,6 +47,22 @@ interface PreviewRow {
   origin: string;
 }
 
+/** One segment of a hexagon block: how many times it kept, and the fastest, middle and slowest. */
+interface SampleSummary {
+  segment: string;
+  count: number;
+  /** Milliseconds, or null when this segment has no times. */
+  minMs: number | null;
+  medianMs: number | null;
+  maxMs: number | null;
+}
+
+/**
+ * What a preview is of. Omitted means the finished comparison.
+ * "times" is one round block. "samples" is one hexagon block.
+ */
+type PreviewOf = "comparison" | "times" | "samples";
+
 interface PreviewResultMessage {
   type: "previewResult";
   requestId: number;
@@ -60,6 +76,16 @@ interface PreviewResultMessage {
    * the page then derives from the rows.
    */
   emptyStatus?: string | null;
+  /**
+   * Same sentence as the settings list when a range or reached segment names a
+   * segment the splits don't have. Null when every named segment exists.
+   * Omitted by the browser stand-in, which the page then derives from the program.
+   */
+  segmentWarning?: string | null;
+  /** Echoed from the request so a late reply cannot be drawn as the other mode. */
+  of?: PreviewOf;
+  /** Set when `of` is "samples". `rows` is empty in that case. */
+  samples?: SampleSummary[];
 }
 
 interface SaveResultMessage {
@@ -82,7 +108,17 @@ interface PreviewRequest {
   timingMethod: TimingMethod;
   /** What the differences are measured against. */
   compareTo: string;
-  /** The program to preview. */
+  /**
+   * What to preview. Omitted means the finished comparison.
+   * "times": program.root is one round block, evaluated like any comparison root.
+   * "samples": program.root is one hexagon block. The host reads it with
+   * ProgramSerializer.ReadSamplesRoot and replies with sample summaries.
+   */
+  of?: PreviewOf;
+  /**
+   * The program to preview. For "times" and "samples" this root is the clicked
+   * block's subtree, not the whole comparison.
+   */
   program: ProgramDoc;
   /** The editor's other complete programs, which the previewed one may use by name. */
   others: ProgramDoc[];

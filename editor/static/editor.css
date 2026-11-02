@@ -247,6 +247,37 @@ button:focus-visible, input:focus-visible {
 
 .preview-title { font-weight: 600; font-size: 14px; }
 
+.block-banner {
+  margin: 0 10px 8px;
+  padding: 10px 12px;
+  border: 2px solid var(--warn);
+  border-radius: 8px;
+  background: #3a3214;
+}
+
+.block-banner-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.block-banner-detail {
+  margin: 4px 0 8px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.preview.samples-mode .preview-note { display: none; }
+
+.preview.samples-mode .row {
+  grid-template-columns: minmax(72px, 1.3fr) 0.55fr repeat(3, minmax(0, 1fr));
+  column-gap: 6px;
+}
+
+.row.head span { white-space: nowrap; }
+.row.empty { color: var(--muted); }
+
 .toggle {
   display: flex;
   padding: 2px;

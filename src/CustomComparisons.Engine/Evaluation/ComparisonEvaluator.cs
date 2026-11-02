@@ -40,6 +40,29 @@ public sealed class ComparisonResult
     }
 }
 
+/// <summary>
+/// One segment of a hexagon block: how many times it kept, and the fastest, middle and slowest.
+/// A segment the block cleared has <see cref="Count"/> 0 and null times.
+/// </summary>
+public sealed class SampleSegmentSummary
+{
+    public SampleSegmentSummary(int count, TimeSpan? min, TimeSpan? median, TimeSpan? max)
+    {
+        Count = count;
+        Min = min;
+        Median = median;
+        Max = max;
+    }
+
+    public int Count { get; }
+
+    public TimeSpan? Min { get; }
+
+    public TimeSpan? Median { get; }
+
+    public TimeSpan? Max { get; }
+}
+
 /// <summary>Raised for problems in a program itself (unknown comparison, cycle).</summary>
 public sealed class ProgramException : Exception
 {
@@ -106,6 +129,21 @@ public sealed class ComparisonEvaluator
 
         string[] origins = session.Trace(programs[programName].Root).paths;
         return new ComparisonResult(result.SegmentTimes, result.SplitTimes, null, origins);
+    }
+
+    /// <summary>
+    /// Evaluates one hexagon block (a list of times per segment) and summarises each segment.
+    /// Any <see cref="TimesNode"/> can already be evaluated by using it as a program root;
+    /// this is the matching path for a <see cref="SamplesNode"/>, which cannot be a root.
+    /// </summary>
+    public IReadOnlyList<SampleSegmentSummary> SummarizeSamples(SamplesNode node, RunData run)
+    {
+        if (node == null)
+        {
+            throw new ArgumentNullException(nameof(node));
+        }
+
+        return new Session(this, run).Summarize(node);
     }
 
     /// <summary>One evaluation pass over one run. Caches results so shared sub-programs run once.</summary>
@@ -421,6 +459,26 @@ public sealed class ComparisonEvaluator
             {
                 Sample match = history[i].FirstOrDefault(s => s.AttemptIndex == number);
                 result[i] = match.AttemptIndex == number ? match.Time : null;
+            }
+
+            return result;
+        }
+
+        /// <summary>Count, fastest, middle and slowest time for each segment. Empty segments stay null.</summary>
+        public SampleSegmentSummary[] Summarize(SamplesNode node)
+        {
+            List<Sample>[] perSegment = EvalSamples(node);
+            var result = new SampleSegmentSummary[perSegment.Length];
+            for (int i = 0; i < perSegment.Length; i++)
+            {
+                List<Sample> samples = perSegment[i];
+                result[i] = samples.Count == 0
+                    ? new SampleSegmentSummary(0, null, null, null)
+                    : new SampleSegmentSummary(
+                        samples.Count,
+                        AggregateSamples(AggregateKind.Min, samples),
+                        AggregateSamples(AggregateKind.Median, samples),
+                        AggregateSamples(AggregateKind.Max, samples));
             }
 
             return result;
