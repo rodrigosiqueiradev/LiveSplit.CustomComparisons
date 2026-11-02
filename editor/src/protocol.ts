@@ -54,6 +54,12 @@ interface PreviewResultMessage {
   error: string | null;
   /** The comparison referenceMs comes from. */
   compareTo?: string;
+  /**
+   * Same sentence as the settings list when this timing method left segments empty.
+   * Null when every segment has a time. Omitted by the browser stand-in, which
+   * the page then derives from the rows.
+   */
+  emptyStatus?: string | null;
 }
 
 interface SaveResultMessage {

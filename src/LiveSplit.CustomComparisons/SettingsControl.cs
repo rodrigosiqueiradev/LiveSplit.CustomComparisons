@@ -69,6 +69,7 @@ internal sealed class SettingsControl : UserControl
             MultiSelect = false,
             HideSelection = false,
             HeaderStyle = ColumnHeaderStyle.Nonclickable,
+            ShowItemToolTips = true,
         };
         list.Columns.Add("Comparison", 160);
         list.Columns.Add("Status", 200);
@@ -163,12 +164,18 @@ internal sealed class SettingsControl : UserControl
         list.Items.Clear();
         foreach (StoredComparison entry in component.Library.Entries)
         {
-            string problem = component.StatusOf(entry);
-            var item = new ListViewItem(entry.Name) { Tag = entry };
-            item.SubItems.Add(problem ?? "Working");
-            if (problem != null)
+            ComparisonStatus status = component.StatusOf(entry);
+            var item = new ListViewItem(entry.Name) { Tag = entry, ToolTipText = status.Text };
+            item.SubItems.Add(status.Text);
+            if (status.IsProblem)
             {
                 item.ForeColor = Color.Firebrick;
+            }
+            else if (status.IsWarning)
+            {
+                // Amber, so a gap is distinct from "Working" (default text) and from an error (red).
+                item.UseItemStyleForSubItems = false;
+                item.SubItems[1].ForeColor = Color.FromArgb(0x8A, 0x5A, 0x00);
             }
 
             list.Items.Add(item);

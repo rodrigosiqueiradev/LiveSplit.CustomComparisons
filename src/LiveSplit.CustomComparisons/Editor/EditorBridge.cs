@@ -193,7 +193,13 @@ internal sealed class EditorBridge
         }
 
         reply.Add("compareTo", compareTo);
-        return reply.Add("rows", rows).Add("error", result.Error == null ? JsonNull.Instance : new JsonString(result.Error));
+        // Same sentence the settings list shows. Null when this timing method filled every segment.
+        string emptyStatus = result.Error == null
+            ? EmptySegmentStatus.Describe(Enumerable.Range(0, run.Count).Select(i => run[i].Name).ToList(), result.SegmentTimes)
+            : null;
+        return reply.Add("rows", rows)
+            .Add("error", result.Error == null ? JsonNull.Instance : new JsonString(result.Error))
+            .Add("emptyStatus", emptyStatus == null ? JsonNull.Instance : new JsonString(emptyStatus));
     }
 
     // ------------------------------------------------------------ save
