@@ -113,6 +113,35 @@ public class EvaluatorTests
     }
 
     [Fact]
+    public void Missing_timing_method_is_not_a_skipped_split()
+    {
+        // Cave was reached but has no time for this method. Temple's 8s still counts.
+        RunData run = new RunBuilder("Cave", "Temple", "Finish")
+            .Attempt(null, 8, 12)
+            .NoTime(0)
+            .Attempt(100, 100, 100)
+            .Build();
+
+        ComparisonResult result = Run(new AggregateNode(AggregateKind.Min, History), run);
+
+        Assert.Equal(new double?[] { 100, 8, 12 }, Seconds(result.SegmentTimes));
+        Assert.Equal(new double?[] { 100, 108, 120 }, Seconds(result.SplitTimes));
+    }
+
+    [Fact]
+    public void Missing_timing_method_does_not_clear_an_earlier_skip()
+    {
+        // A has no time. B was skipped, so C's 50 still covers B and C and is ignored.
+        RunData run = new RunBuilder("A", "B", "C")
+            .Attempt(null, null, 50)
+            .NoTime(0)
+            .Attempt(12, 20, 30)
+            .Build();
+
+        Assert.Equal(new double?[] { 12, 20, 30 }, Seconds(Run(new AggregateNode(AggregateKind.Min, History), run).SegmentTimes));
+    }
+
+    [Fact]
     public void A_segment_without_data_empties_every_later_split()
     {
         RunData run = new RunBuilder("A", "B", "C")

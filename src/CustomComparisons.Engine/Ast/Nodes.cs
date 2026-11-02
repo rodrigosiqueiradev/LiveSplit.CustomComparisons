@@ -62,7 +62,9 @@ public sealed class ComparisonProgram
 /// <summary>
 /// Every recorded time for each segment, from the run's segment history.
 /// Skipped segments are left out, and so is the segment right after a skip,
-/// because its recorded time covers both segments.
+/// because its recorded time covers both segments. A segment the attempt reached
+/// with no time for this timing method is left out too, but it is not a skip:
+/// the next segment still counts.
 /// </summary>
 public sealed class SegmentHistoryNode : SamplesNode
 {
@@ -203,7 +205,7 @@ public sealed class AtLeastNode : SamplesNode
 
 /// <summary>
 /// The segment times of one past attempt, by its number in LiveSplit's attempt history.
-/// Segments that attempt skipped or never reached are empty.
+/// Segments that attempt skipped, that have no time for this timing method, or that it never reached are empty.
 /// </summary>
 public sealed class AttemptNode : TimesNode
 {
@@ -222,7 +224,8 @@ public sealed class AttemptNode : TimesNode
 
 /// <summary>
 /// Keeps only times from attempts that got at least as far as segment <see cref="Segment"/>
-/// (1-based): they have a recorded or skipped time for it. Good for reset-heavy games, where
+/// (1-based): they have a recorded time, a skipped split, or a missing time for this
+/// timing method. Good for reset-heavy games, where
 /// few runs finish. A segment past the end of the run keeps nothing.
 /// </summary>
 public sealed class ReachedSegmentNode : SamplesNode

@@ -48,19 +48,31 @@ public sealed class RunData
 
 public sealed class SegmentData
 {
+    private readonly HashSet<int> missingTime;
+
     public string Name { get; }
 
     /// <summary>
     /// Attempt index -> recorded segment time. A null value means the segment was
-    /// skipped in that attempt. A missing key means the attempt never reached it.
+    /// skipped in that attempt, unless <see cref="IsMissingTime"/> is true for that
+    /// attempt: the runner reached the segment, but this timing method has no time.
+    /// A missing key means the attempt never reached it.
     /// </summary>
     public IReadOnlyDictionary<int, TimeSpan?> History { get; }
 
-    public SegmentData(string name, IReadOnlyDictionary<int, TimeSpan?> history)
+    public SegmentData(string name, IReadOnlyDictionary<int, TimeSpan?> history, IEnumerable<int> missingTime = null)
     {
         Name = name ?? "";
         History = history ?? new Dictionary<int, TimeSpan?>();
+        this.missingTime = missingTime == null ? new HashSet<int>() : new HashSet<int>(missingTime);
     }
+
+    /// <summary>
+    /// True when this attempt reached the segment but recorded no time for this timing
+    /// method (real time with no game time, or the reverse). That is not a skipped split:
+    /// the next segment's time still counts.
+    /// </summary>
+    public bool IsMissingTime(int attemptIndex) => missingTime.Contains(attemptIndex);
 }
 
 public sealed class AttemptData

@@ -200,7 +200,7 @@ tests/
 - **Per segment.** Every block works on segment times. Splits are summed only at the end.
   Like LiveSplit's Average/Median Segments, the result may not match any real run.
 - **Both timing methods.** Every program is evaluated for real time and game time.
-- **Skipped splits.** A skipped segment and the combined segment after it are ignored, matching LiveSplit.
+- **Skipped splits.** A skipped segment and the combined segment after it are ignored, matching LiveSplit. A segment that was reached but has no time for this timing method (real time recorded and game time missing, or the reverse) is left out of that method only. It is not a skip, so the next segment still counts.
 - **"Last N"** counts the last N times *that segment* was completed, not the last N attempts.
 - **Median** is the plain median. LiveSplit's built-in Median Segments weights recent runs more heavily, so the numbers can differ.
 - **Empty stays empty.** A segment with no data stays empty, and so does every split after it,
@@ -217,9 +217,9 @@ tests/
   small lists are left alone.
 - **At least N** empties a segment's list when it has fewer than N times. Pair it with
   "if empty, use" for "use my median, unless there's too little data".
-- **Attempt #N** is empty where that attempt skipped a split or reset. An attempt number
+- **Attempt #N** is empty where that attempt skipped a split, has no time for this timing method, or reset. An attempt number
   that doesn't exist is reported as an error.
-- **Reached segment X** keeps attempts with a recorded or skipped time for segment X.
+- **Reached segment X** keeps attempts with a recorded time, a skipped split, or a missing time for this timing method on segment X.
 - **Recent-weighted average**: the newest time weighs 1, and the weight halves every
   `halfLife` older times of that segment.
 - **Keep between** (`clamp`) applies "never slower than" then "never faster than", so if
