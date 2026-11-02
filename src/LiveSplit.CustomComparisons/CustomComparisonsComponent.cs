@@ -178,19 +178,39 @@ public sealed class CustomComparisonsComponent : LogicComponent
 
     // ------------------------------------------------------------ Used by the settings page
 
-    internal string StatusOf(StoredComparison entry)
+    /// <summary>
+    /// What's shown in the settings list. An unreadable file, a name clash or an
+    /// evaluation failure is an error. Otherwise the warning describes the timing
+    /// method LiveSplit is currently set to, and says nothing about the other one:
+    /// most runs have no game time, and warning about that while the runner is on
+    /// real time would mark a healthy comparison as empty.
+    /// </summary>
+    internal ComparisonStatus StatusOf(StoredComparison entry)
     {
         if (!entry.IsReadable)
         {
-            return entry.LoadError;
+            return ComparisonStatus.Problem(string.IsNullOrEmpty(entry.LoadError) ? "Couldn't read this comparison." : entry.LoadError);
         }
 
         if (blockedReasons.TryGetValue(entry.Name, out string reason))
         {
-            return reason;
+            return ComparisonStatus.Problem(reason);
         }
 
-        return generators.FirstOrDefault(g => g.Name == entry.Name)?.LastError;
+        ProgramComparisonGenerator generator = generators.FirstOrDefault(g => g.Name == entry.Name);
+        if (generator == null)
+        {
+            return ComparisonStatus.Working();
+        }
+
+        if (generator.LastError != null)
+        {
+            return ComparisonStatus.Problem(generator.LastError);
+        }
+
+        TimingMethod method = state?.CurrentTimingMethod ?? TimingMethod.RealTime;
+        string gap = generator.EmptyWarningFor(method);
+        return gap == null ? ComparisonStatus.Working() : ComparisonStatus.Warning(gap);
     }
 
     internal string Import(ProgramDocument document)
@@ -329,4 +349,29 @@ public sealed class CustomComparisonsComponent : LogicComponent
 
         settingsControl.Dispose();
     }
+}
+
+/// <summary>One row of the settings list: working, an empty-segment warning, or an error.</summary>
+internal readonly struct ComparisonStatus
+{
+    private ComparisonStatus(string text, bool warning, bool problem)
+    {
+        Text = text;
+        IsWarning = warning;
+        IsProblem = problem;
+    }
+
+    public string Text { get; }
+
+    /// <summary>Evaluated, but at least one segment has no time. Not an error.</summary>
+    public bool IsWarning { get; }
+
+    /// <summary>The comparison is unreadable, blocked, or failed to evaluate.</summary>
+    public bool IsProblem { get; }
+
+    public static ComparisonStatus Working() => new ComparisonStatus("Working", false, false);
+
+    public static ComparisonStatus Warning(string text) => new ComparisonStatus(text, true, false);
+
+    public static ComparisonStatus Problem(string text) => new ComparisonStatus(text, false, true);
 }
